@@ -1,27 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2 class="mb-4">📦 Inventario</h2>
+<h2 class="mb-4 fw-bold">📦 Inventario</h2>
 
 <div class="row g-4">
 
-<!-- 🟢 AGREGAR STOCK (GENERAL) -->
+<!-- 🟢 AGREGAR STOCK -->
 {% if session.get("rol") == "admin" %}
-<div class="col-md-4">
-<div class="card shadow p-4">
+<div class="col-lg-4 col-md-6 col-12">
+<div class="card p-4 h-100">
 
-<h5 class="text-success mb-3">Agregar stock</h5>
+<h5 class="text-success mb-3">➕ Agregar stock</h5>
 
 <form method="post">
 
-<label>Producto</label>
+<label class="form-label">Producto</label>
 <select name="producto" class="form-select mb-2">
 {% for p in productos %}
 <option>{{p[0]}}</option>
 {% endfor %}
 </select>
 
-<label>Cantidad</label>
+<label class="form-label">Cantidad</label>
 <input name="cantidad" class="form-control mb-3" placeholder="Ej: 10">
 
 <button class="btn btn-success w-100">Agregar</button>
@@ -33,24 +33,24 @@
 {% endif %}
 
 <!-- 🔴 RETIRAR PRODUCTO -->
-<div class="col-md-4">
-<div class="card shadow p-4">
+<div class="col-lg-4 col-md-6 col-12">
+<div class="card p-4 h-100">
 
-<h5 class="text-danger mb-3">Retirar producto</h5>
+<h5 class="text-danger mb-3">➖ Retirar producto</h5>
 
 <form action="/salida" method="post">
 
-<label>Producto</label>
+<label class="form-label">Producto</label>
 <select name="producto" class="form-select mb-2">
 {% for p in productos %}
 <option>{{p[0]}}</option>
 {% endfor %}
 </select>
 
-<label>Cantidad</label>
+<label class="form-label">Cantidad</label>
 <input name="cantidad" class="form-control mb-2" placeholder="Ej: 5">
 
-<label>Ubicación</label>
+<label class="form-label">Ubicación</label>
 <select name="ubicacion" class="form-select mb-3">
 <option value="Piscina">Piscina</option>
 <option value="Pasillos">Pasillos</option>
@@ -66,17 +66,19 @@
 </div>
 
 <!-- 📊 STOCK ACTUAL -->
-<div class="col-md-4">
-<div class="card shadow p-4">
+<div class="col-lg-4 col-12">
+<div class="card p-4 h-100">
 
-<h5 class="mb-3">Stock actual</h5>
+<h5 class="mb-3">📊 Stock actual</h5>
 
-<table class="table table-hover">
-<thead>
+<div class="table-responsive">
+<table class="table table-hover tabla-pro">
+
+<thead class="table-dark">
 <tr>
 <th>Producto</th>
 <th>Ubicación</th>
-<th>Cantidad</th>
+<th class="text-center">Cantidad</th>
 <th>Usuario</th>
 </tr>
 </thead>
@@ -84,15 +86,39 @@
 <tbody>
 {% for s in stock_actual %}
 <tr>
-<td>{{s[0]}}</td>
+<td class="fw-semibold">{{s[0]}}</td>
 <td>{{s[1]}}</td>
-<td><b>{{s[2]}}</b></td>
-<td>{{s[3]}}</td>
+
+<!-- RESULTADO
+Ahora tu sistema muestra:
+🔴 0–5 → crítico (rojo)
+🟡 6–15 → medio (amarillo)
+🟢 16+ → óptimo (verde) -->
+<td class="text-center">
+{% if s[2] <= 5 %}
+<span class="badge bg-danger fs-6 px-3 py-2">
+{{s[2]}}
+</span>
+
+{% elif s[2] <= 15 %}
+<span class="badge bg-warning text-dark fs-6 px-3 py-2">
+{{s[2]}}
+</span>
+
+{% else %}
+<span class="badge bg-success fs-6 px-3 py-2">
+{{s[2]}}
+</span>
+{% endif %}
+</td>
+
+<td class="text-muted">{{s[3]}}</td>
 </tr>
 {% endfor %}
 </tbody>
 
 </table>
+</div>
 
 </div>
 </div>
