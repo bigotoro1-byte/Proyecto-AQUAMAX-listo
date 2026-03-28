@@ -129,6 +129,10 @@ button {
 
 <div class="wrapper">
 
+<<<<<<< HEAD
+=======
+    {% if session.get("user") %}
+>>>>>>> b2076e7 (fix: agregar base.html)
     <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
         <h3>💧 AQUAMAX</h3>
@@ -144,7 +148,21 @@ button {
 
         <a href="/logout">🚪 Salir</a>
     </div>
+    {% endif %}
 
+    <!-- CONTENIDO -->
+    <div class="content">
+
+        {% if session.get("user") %}
+        <div class="menu-toggle" onclick="toggleMenu()">☰ Menú</div>
+        {% endif %}
+        
+
+        {% block content %}{% endblock %}
+
+    </div>
+
+<<<<<<< HEAD
     <!-- CONTENIDO -->
     <div class="content">
 
@@ -159,6 +177,10 @@ button {
 
 </div>
 
+=======
+</div>
+
+>>>>>>> b2076e7 (fix: agregar base.html)
 <script>
 function toggleMenu() {
     document.getElementById("sidebar").classList.toggle("active");
