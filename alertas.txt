@@ -1,0 +1,12 @@
+2026-03-22 22:22:50.186527 - ALERTA: carlos uso 10.0 unidades de 1
+2026-03-22 22:34:07.028727 - ALERTA: carlos uso 10.0 unidades de 1
+2026-03-22 22:34:14.292391 - ALERTA: carlos uso 10.0 unidades de 1
+2026-03-22 22:48:43.728369 - ALERTA: carlos uso 10.0 unidades de cloro
+2026-03-22 22:58:18.162022 - ALERTA: carlos uso 10.0 de cloro en piscina 1
+2026-03-22 22:58:24.738986 - ALERTA: carlos uso 10.0 de cloro en piscina 2
+2026-03-22 23:08:58.503529 - ALERTA: carlos uso 10.0 de cloro en piscina 1
+2026-03-22 23:13:34.305549 - ALERTA: carlos uso 10.0 de cloro en piscina 1
+2026-03-22 23:14:35.071226 - ALERTA: carlos uso 10.0 de cloro en piscina 2
+2026-03-22 23:26:21.004969 - ALERTA: carlos uso 10.0 de cloro en piscina 2
+2026-03-22 23:27:07.452511 - ALERTA: carlos uso 10.0 de cloro en piscina 1
+2026-03-22 23:37:34.001200 - ALERTA: carlos uso 10.0 de cloro en piscina 2

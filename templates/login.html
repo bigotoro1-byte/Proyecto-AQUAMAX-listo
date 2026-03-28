@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+body {
+    background: 
+        linear-gradient(rgba(15,23,42,0.3), rgba(15,23,42,0.3)),
+        url("/static/fondo.jpg") no-repeat center center fixed;
+    background-size: cover;
+}
+
+.overlay {
+    position: fixed;
+    top: 60px; /* 👈 AJUSTA A LA ALTURA DEL NAVBAR */
+    width: 100%;
+    height: calc(100% - 60px);
+    background: rgba(15,23,42,0.25);
+    pointer-events: none;
+}
+
+.login-container {
+    height: 100vh;
+    background: transparent;
+}
+
+.login-card {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    width: 350px;
+    box-shadow: 0px 10px 30px rgba(0,0,0,0.3);
+    position: relative;
+    z-index: 1;
+
+}
+</style>
+
+
+
+<div class="container-fluid login-container d-flex justify-content-center align-items-center">
+
+<div class="login-card">
+
+<h3 class="text-center mb-4">🔐 AQUAMAX</h3>
+
+{% if error %}
+<div class="alert alert-danger text-center">
+    {{ error }}
+</div>
+{% endif %}
+
+<form method="POST">
+
+<input type="text" name="user" class="form-control mb-3" placeholder="Usuario" required>
+
+<input type="password" name="password" class="form-control mb-3" placeholder="Contraseña" required>
+
+<button type="submit" class="btn btn-primary w-100">Ingresar</button>
+
+</form>
+
+</div>
+
+</div>
+
+{% endblock %}

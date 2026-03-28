@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="mb-4">📊 Dashboard</h2>
+
+<!-- 🔢 CARDS -->
+<div class="row g-4 mb-4">
+
+<div class="col-md-4">
+<div class="card shadow p-4 text-center">
+<h6>Total Inventario</h6>
+<h2 class="text-primary">{{total}}</h2>
+</div>
+</div>
+
+<div class="col-md-4">
+<div class="card shadow p-4 text-center">
+<h6>Productos</h6>
+<h2 class="text-success">{{total_productos}}</h2>
+</div>
+</div>
+
+<div class="col-md-4">
+<div class="card shadow p-4 text-center">
+<h6>Alertas</h6>
+<h2 class="text-danger">{{stock_bajo}}</h2>
+</div>
+</div>
+
+</div>
+
+<!-- 📊 GRAFICOS -->
+<div class="row g-4">
+
+<!-- 📊 GRAFICO PRINCIPAL -->
+<div class="col-md-8">
+<div class="card shadow p-4">
+
+<h6 class="mb-3">Stock por producto</h6>
+
+<canvas id="grafica" style="max-height:220px;"></canvas>
+
+</div>
+</div>
+
+<!-- 📊 MINI RESUMEN -->
+<div class="col-md-4">
+<div class="card shadow p-4">
+
+<h6 class="mb-3">Resumen rápido</h6>
+
+<ul class="list-group">
+
+{% for p, c in resumen %}
+<li class="list-group-item d-flex justify-content-between">
+<span>{{p}}</span>
+<b>{{c}}</b>
+</li>
+{% endfor %}
+
+</ul>
+
+</div>
+</div>
+
+</div>
+
+<!-- 📊 SCRIPT -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+const labels = {{productos | default([]) | tojson}};
+const data = {{cantidades | default([]) | tojson}};
+
+new Chart(document.getElementById("grafica"), {
+    type: "bar",
+    data: {
+        labels: labels,
+        datasets: [{
+            label: "Stock",
+            data: data,
+            borderWidth: 1,
+            borderRadius: 5
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+
+        plugins: {
+            legend: { display: false },
+
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return "Cantidad: " + context.raw;
+                    }
+                }
+            }
+        },
+
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 50
+                }
+            }
+        }
+    }
+});
+</script>
+
+{% endblock %}

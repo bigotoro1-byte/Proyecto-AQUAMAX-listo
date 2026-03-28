@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>AQUAMAX</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body {
+    background: #f4f6f9;
+    font-family: Arial;
+}
+
+/* NAVBAR */
+.navbar {
+    background: #0f172a;
+}
+
+.navbar a {
+    color: white !important;
+    margin-right: 15px;
+}
+
+/* CONTENIDO */
+.container-box {
+    padding: 25px;
+}
+
+/* CARDS */
+.card {
+    border: none;
+    border-radius: 12px;
+    transition: 0.3s;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+}
+
+/* TITULOS */
+h2 {
+    font-weight: 600;
+}
+
+label {
+    font-weight: 500;
+}
+
+</style>
+</head>
+
+<body>
+
+<nav class="navbar p-3">
+<a href="/dashboard">📊 Dashboard</a>
+<a href="/inventario">📦 Inventario</a>
+<a href="/reporte">📄 Reporte</a>
+
+{% if session.get("rol") == "admin" %}
+<a href="/productos">📋 Productos</a>
+<a href="/admin/usuarios">👤 Usuarios</a>
+{% endif %}
+
+<a href="/logout">🚪 Salir</a>
+</nav>
+
+<div class="container container-box">
+{% block content %}{% endblock %}
+</div>
+
+</body>
+</html>

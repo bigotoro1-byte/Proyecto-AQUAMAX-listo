@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+
+<!-- HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📄 Reporte de Inventario</h2>
+    {% if request.args.get('producto') or request.args.get('ubicacion') %}
+<div class="alert alert-light border shadow-sm">
+
+<b>Filtros activos:</b>
+
+{% if request.args.get('producto') %}
+<span class="badge bg-primary">
+Producto: {{request.args.get('producto')}}
+</span>
+{% endif %}
+
+{% if request.args.get('ubicacion') %}
+<span class="badge bg-success">
+Ubicación: {{request.args.get('ubicacion')}}
+</span>
+{% endif %}
+
+</div>
+{% endif %}
+    <a href="/reporte/pdf?producto={{request.args.get('producto','')}}&ubicacion={{request.args.get('ubicacion','')}}" 
+class="btn btn-danger">
+📥 Descargar PDF
+</a>
+</div>
+
+<!-- 🔍 FILTROS -->
+<div class="card shadow p-4 mb-4">
+
+<form method="get" class="row g-3">
+
+<!-- PRODUCTO -->
+<div class="col-md-4">
+<label class="form-label">Producto</label>
+<select name="producto" class="form-select">
+<option value="">Todos</option>
+
+{% for p in lista_productos %}
+<option value="{{p}}" {% if request.args.get('producto') == p %}selected{% endif %}>
+{{p}}
+</option>
+{% endfor %}
+
+</select>
+</div>
+
+<!-- UBICACION -->
+<div class="col-md-4">
+<label class="form-label">Ubicación</label>
+<select name="ubicacion" class="form-select">
+<option value="">Todas</option>
+
+{% for u in lista_ubicaciones %}
+<option value="{{u}}" {% if request.args.get('ubicacion') == u %}selected{% endif %}>
+{{u}}
+</option>
+{% endfor %}
+
+</select>
+</div>
+
+<!-- BOTONES -->
+<div class="col-md-4 d-flex align-items-end gap-2">
+<button class="btn btn-primary w-100">Filtrar</button>
+<a href="/reporte" class="btn btn-secondary w-100">Limpiar</a>
+</div>
+
+</form>
+
+</div>
+
+<!-- 📊 TABLA -->
+<div class="card shadow p-4">
+
+<table class="table table-hover table-striped align-middle">
+<thead class="table-dark">
+<tr>
+<th>Producto</th>
+<th>Ubicación</th>
+<th>Total</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% if reporte %}
+    {% for r in reporte %}
+    <tr>
+        <td>{{r[0]}}</td>
+        <td>{{r[1]}}</td>
+        <td class="fw-bold text-primary">{{r[2]}}</td>
+    </tr>
+    {% endfor %}
+{% else %}
+    <tr>
+        <td colspan="3" class="text-center text-muted">
+            No hay datos disponibles
+        </td>
+    </tr>
+{% endif %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+{% endblock %}
