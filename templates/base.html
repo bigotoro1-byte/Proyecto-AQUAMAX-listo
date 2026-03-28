@@ -5,201 +5,120 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AQUAMAX</title>
 
-<!-- Bootstrap -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<!-- Tipografía moderna -->
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 
 <style>
 
 /* =========================
-   RESET Y BASE
+   BASE
 ========================= */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
 body {
-    background: #f1f5f9;
+    margin: 0;
     font-family: 'Inter', sans-serif;
-    color: #1e293b;
+    background: #f1f5f9;
 }
 
 /* =========================
-   CONTENEDOR
+   LAYOUT
 ========================= */
-.container {
-    width: 92%;
-    max-width: 1280px;
-    margin: auto;
-}
-
-.container-box {
-    padding: 30px 10px;
+.wrapper {
+    display: flex;
+    min-height: 100vh;
 }
 
 /* =========================
-   NAVBAR EMPRESARIAL
+   SIDEBAR
 ========================= */
-.navbar-custom {
-    background: linear-gradient(90deg, #0f172a, #1e293b);
-    border-bottom: 2px solid #0ea5e9;
+.sidebar {
+    width: 240px;
+    background: #0f172a;
+    color: white;
+    padding: 20px;
+    transition: 0.3s;
 }
 
-.navbar-custom a {
-    color: #e2e8f0 !important;
-    margin-right: 18px;
-    font-weight: 500;
+.sidebar h3 {
+    font-size: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.sidebar a {
+    display: block;
+    color: #cbd5e1;
     text-decoration: none;
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 8px;
     transition: 0.2s;
 }
 
-.navbar-custom a:hover {
-    color: #38bdf8 !important;
+.sidebar a:hover {
+    background: #1e293b;
+    color: #38bdf8;
 }
 
 /* =========================
-   INPUTS Y BOTONES
+   CONTENIDO
 ========================= */
-input, select {
-    width: 100%;
-    padding: 12px;
-    margin: 8px 0;
-    font-size: 15px;
-    border-radius: 8px;
-    border: 1px solid #cbd5e1;
-}
-
-button {
-    width: 100%;
-    padding: 12px;
-    margin: 10px 0;
-    background: linear-gradient(90deg, #0ea5e9, #0284c7);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-weight: 600;
-    transition: 0.3s;
-}
-
-button:hover {
-    transform: scale(1.02);
-    background: linear-gradient(90deg, #0284c7, #0369a1);
+.content {
+    flex: 1;
+    padding: 25px;
 }
 
 /* =========================
-   CARDS PROFESIONALES
+   CARDS
 ========================= */
 .card {
     border: none;
-    border-radius: 14px;
+    border-radius: 12px;
     padding: 20px;
     background: white;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.05);
-    transition: 0.3s;
-}
-
-.card:hover {
-    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
 }
 
 /* =========================
-   TITULOS
+   BOTONES
 ========================= */
-h1, h2 {
-    font-weight: 600;
-    margin-bottom: 15px;
-}
-
-label {
-    font-weight: 500;
-    color: #334155;
-}
-
-/* =========================
-   TABLAS
-========================= */
-table {
+button {
     width: 100%;
-    border-collapse: collapse;
-    background: white;
-    border-radius: 10px;
-    overflow: hidden;
-}
-
-th {
-    background: #0f172a;
-    color: white;
-    padding: 12px;
-    text-align: left;
-}
-
-td {
     padding: 10px;
-    border-bottom: 1px solid #e2e8f0;
-}
-
-/* =========================
-   BADGES / ESTADOS
-========================= */
-.badge-success {
-    background: #22c55e;
+    border: none;
+    border-radius: 8px;
+    background: #0ea5e9;
     color: white;
-    padding: 5px 10px;
-    border-radius: 6px;
-}
-
-.badge-danger {
-    background: #ef4444;
-    color: white;
-    padding: 5px 10px;
-    border-radius: 6px;
 }
 
 /* =========================
    RESPONSIVE
 ========================= */
-@media (max-width: 992px) {
-    .navbar-flex {
-        flex-direction: column;
-        align-items: flex-start !important;
+@media (max-width: 768px) {
+
+    .sidebar {
+        position: fixed;
+        left: -240px;
+        top: 0;
+        height: 100%;
+        z-index: 1000;
     }
 
-    .nav-links {
-        margin-top: 10px;
+    .sidebar.active {
+        left: 0;
     }
 
-    .nav-links a {
+    .menu-toggle {
         display: block;
-        margin: 6px 0;
+        margin-bottom: 15px;
+        cursor: pointer;
+        font-size: 20px;
     }
 }
 
-@media (max-width: 768px) {
-    h1 {
-        font-size: 22px;
-        text-align: center;
-    }
-
-    h2 {
-        font-size: 18px;
-        text-align: center;
-    }
-
-    .container {
-        width: 95%;
-    }
-
-    table {
-        display: block;
-        overflow-x: auto;
-    }
-
-    button {
-        font-size: 14px;
+@media (min-width: 769px) {
+    .menu-toggle {
+        display: none;
     }
 }
 
@@ -208,11 +127,12 @@ td {
 
 <body>
 
-<!-- NAVBAR -->
-<nav class="navbar navbar-custom p-3">
-<div class="container-fluid navbar-flex d-flex justify-content-between align-items-center">
+<div class="wrapper">
 
-    <div class="nav-links">
+    <!-- SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+        <h3>💧 AQUAMAX</h3>
+
         <a href="/dashboard">📊 Dashboard</a>
         <a href="/inventario">📦 Inventario</a>
         <a href="/reporte">📄 Reporte</a>
@@ -221,22 +141,29 @@ td {
         <a href="/productos">📋 Productos</a>
         <a href="/admin/usuarios">👤 Usuarios</a>
         {% endif %}
-    </div>
 
-    <div>
         <a href="/logout">🚪 Salir</a>
     </div>
 
-</div>
-</nav>
+    <!-- CONTENIDO -->
+    <div class="content">
 
-<!-- CONTENIDO DINÁMICO -->
-<div class="container container-box">
-    {% block content %}{% endblock %}
+        <!-- BOTÓN MÓVIL -->
+        <div class="menu-toggle" onclick="toggleMenu()">
+            ☰ Menú
+        </div>
+
+        {% block content %}{% endblock %}
+
+    </div>
+
 </div>
 
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function toggleMenu() {
+    document.getElementById("sidebar").classList.toggle("active");
+}
+</script>
 
 </body>
 </html>
