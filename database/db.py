@@ -5,6 +5,18 @@ import os
 def conectar():
     database_url = os.environ.get("DATABASE_URL")
 
+    try:
+        # 🔥 Si hay URL → PostgreSQL (Render)
+        if database_url:
+            return psycopg2.connect(database_url)
+
+        # 💻 Local → SQLite
+        return sqlite3.connect("aquamax.db")
+
+    except Exception as e:
+        print("Error de conexión:", e)
+        return sqlite3.connect("aquamax.db")
+
     # 🔥 SI ESTÁ EN RENDER → USA POSTGRESQL
     if database_url:
         return psycopg2.connect(database_url)
