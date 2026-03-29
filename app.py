@@ -27,7 +27,7 @@ def crear_admin():
     password = generate_password_hash("1234")
 
     cursor.execute(
-        "INSERT OR IGNORE INTO usuarios VALUES (?, ?, ?)",
+        "INSERT INTO usuarios (username, password, rol)",
         ("admin", password, "admin")
     )
 
