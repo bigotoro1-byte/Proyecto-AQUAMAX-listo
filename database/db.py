@@ -1,6 +1,15 @@
 import sqlite3
+import psycopg2
+import os
 
 def conectar():
+    database_url = os.environ.get("DATABASE_URL")
+
+    # 🔥 SI ESTÁ EN RENDER → USA POSTGRESQL
+    if database_url:
+        return psycopg2.connect(database_url)
+
+    # 💻 SI ESTÁS EN LOCAL → USA SQLITE
     return sqlite3.connect("aquamax.db")
 
 # 🔥 CREAR TABLAS SI NO EXISTEN
