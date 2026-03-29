@@ -28,7 +28,7 @@ def crear_tablas():
     conn = conectar()
     cursor = conn.cursor()
 
-    # 🔥 PRODUCTOS (igual para ambos)
+    # PRODUCTOS
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS productos (
         id TEXT PRIMARY KEY,
@@ -39,8 +39,8 @@ def crear_tablas():
     )
     """)
 
-    # 🔥 INVENTARIO (CAMBIA SEGÚN DB)
-    if psycopg2 and isinstance(conn, psycopg2.extensions.connection):
+    # INVENTARIO
+    if psycopg2 and hasattr(conn, "cursor") and "psycopg2" in str(type(conn)):
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS inventario (
             id SERIAL PRIMARY KEY,
@@ -63,12 +63,12 @@ def crear_tablas():
         )
         """)
 
-    # 🔥 USUARIOS
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            username TEXT PRIMARY KEY,
-            password TEXT,
-            rol TEXT
+    # USUARIOS (🔥 CORREGIDO)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS usuarios (
+        username TEXT PRIMARY KEY,
+        password TEXT,
+        rol TEXT
     )
     """)
 
