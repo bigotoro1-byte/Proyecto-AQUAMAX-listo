@@ -4,7 +4,4 @@ venv/
 .env
 reportes/
 *.pdf
-<<<<<<< HEAD
-=======
 *.db
->>>>>>> 5b57dc8 (fix: agregar inventario.html)

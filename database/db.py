@@ -4,6 +4,7 @@ import os
 
 def conectar():
     database_url = os.environ.get("DATABASE_URL")
+<<<<<<< HEAD
 
     try:
         # 🔥 Si hay URL → PostgreSQL (Render)
@@ -23,6 +24,8 @@ def conectar():
 
     # 💻 SI ESTÁS EN LOCAL → USA SQLITE
     return sqlite3.connect("aquamax.db")
+=======
+>>>>>>> b10f179 (conexion dual sqlite + postgres)
 
 # 🔥 CREAR TABLAS SI NO EXISTEN
 def crear_tablas():
