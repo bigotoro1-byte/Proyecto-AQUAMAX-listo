@@ -28,6 +28,7 @@ def crear_tablas():
     conn = conectar()
     cursor = conn.cursor()
 
+    # 🔥 PRODUCTOS (igual para ambos)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS productos (
         id TEXT PRIMARY KEY,
@@ -38,17 +39,31 @@ def crear_tablas():
     )
     """)
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS inventario (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        producto TEXT,
-        cantidad REAL,
-        piscina TEXT,
-        fecha TEXT,
-        usuario TEXT
-    )
-    """)
+    # 🔥 INVENTARIO (CAMBIA SEGÚN DB)
+    if psycopg2 and isinstance(conn, psycopg2.extensions.connection):
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS inventario (
+            id SERIAL PRIMARY KEY,
+            producto TEXT,
+            cantidad REAL,
+            piscina TEXT,
+            fecha TEXT,
+            usuario TEXT
+        )
+        """)
+    else:
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS inventario (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            producto TEXT,
+            cantidad REAL,
+            piscina TEXT,
+            fecha TEXT,
+            usuario TEXT
+        )
+        """)
 
+    # 🔥 USUARIOS
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS usuarios (
         user TEXT PRIMARY KEY,
@@ -59,7 +74,6 @@ def crear_tablas():
 
     conn.commit()
     conn.close()
-
 
 # 🔥 MIGRACIÓN SEGURA (NO ROMPE)
 def actualizar_tabla():
