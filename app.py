@@ -26,10 +26,13 @@ def crear_admin():
     cursor = conn.cursor()
     password = generate_password_hash("1234")
 
-    cursor.execute(
-        "INSERT INTO usuarios (username, password, rol)",
-        ("admin", password, "admin")
-    )
+    try:
+        cursor.execute(
+            "INSERT INTO usuarios (username, password, rol) VALUES (%s, %s, %s) ON CONFLICT (username) DO NOTHING",
+            ("admin", password, "admin")
+        )
+    except Exception as e:
+        print("Error creando admin:", e)
 
     conn.commit()
     conn.close()
