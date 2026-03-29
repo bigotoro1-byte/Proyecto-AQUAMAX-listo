@@ -1,56 +1,42 @@
 import sqlite3
 import os
 
-# 🔥 IMPORT SEGURO (NO ROMPE SI NO EXISTE)
 try:
     import psycopg2
+    import psycopg2.extensions
 except:
     psycopg2 = None
 
 
+def es_postgres(conn):
+    return psycopg2 and isinstance(conn, psycopg2.extensions.connection)
+
+
 def conectar():
     database_url = os.environ.get("DATABASE_URL")
-<<<<<<< HEAD
 
     try:
-        # 🔥 Si hay URL → PostgreSQL (Render)
-        if database_url:
-            return psycopg2.connect(database_url)
-
-        # 💻 Local → SQLite
-        return sqlite3.connect("aquamax.db")
-
-    except Exception as e:
-        print("Error de conexión:", e)
-        return sqlite3.connect("aquamax.db")
-
-    # 🔥 SI ESTÁ EN RENDER → USA POSTGRESQL
-    if database_url:
-        return psycopg2.connect(database_url)
-
-    # 💻 SI ESTÁS EN LOCAL → USA SQLITE
-    return sqlite3.connect("aquamax.db")
-=======
->>>>>>> b10f179 (conexion dual sqlite + postgres)
-
-    try:
-        # 🔥 Si hay URL y psycopg2 existe → PostgreSQL
         if database_url and psycopg2:
             return psycopg2.connect(database_url)
 
-        # 💻 Local o fallback → SQLite
         return sqlite3.connect("aquamax.db")
 
     except Exception as e:
         print("Error de conexión:", e)
         return sqlite3.connect("aquamax.db")
 
-# 🔥 CREAR TABLAS SI NO EXISTEN
+
+def ejecutar(cursor, conn, query, params=()):
+    if es_postgres(conn):
+        query = query.replace("?", "%s")
+    cursor.execute(query, params)
+
+
 def crear_tablas():
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    ejecutar(cursor, conn, """
     CREATE TABLE IF NOT EXISTS productos (
         id TEXT PRIMARY KEY,
         nombre TEXT,
@@ -60,18 +46,30 @@ def crear_tablas():
     )
     """)
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS inventario (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        producto TEXT,
-        cantidad REAL,
-        piscina TEXT,
-        fecha TEXT,
-        usuario TEXT
-    )
-    """)
+    if es_postgres(conn):
+        ejecutar(cursor, conn, """
+        CREATE TABLE IF NOT EXISTS inventario (
+            id SERIAL PRIMARY KEY,
+            producto TEXT,
+            cantidad REAL,
+            piscina TEXT,
+            fecha TEXT,
+            usuario TEXT
+        )
+        """)
+    else:
+        ejecutar(cursor, conn, """
+        CREATE TABLE IF NOT EXISTS inventario (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            producto TEXT,
+            cantidad REAL,
+            piscina TEXT,
+            fecha TEXT,
+            usuario TEXT
+        )
+        """)
 
-    cursor.execute("""
+    ejecutar(cursor, conn, """
     CREATE TABLE IF NOT EXISTS usuarios (
         user TEXT PRIMARY KEY,
         password TEXT,
@@ -83,18 +81,17 @@ def crear_tablas():
     conn.close()
 
 
-# 🔥 MIGRACIÓN SEGURA (NO ROMPE)
 def actualizar_tabla():
     conn = conectar()
     cursor = conn.cursor()
 
     try:
-        cursor.execute("ALTER TABLE productos ADD COLUMN fecha TEXT")
+        ejecutar(cursor, conn, "ALTER TABLE productos ADD COLUMN fecha TEXT")
     except:
         pass
 
     try:
-        cursor.execute("ALTER TABLE productos ADD COLUMN usuario TEXT")
+        ejecutar(cursor, conn, "ALTER TABLE productos ADD COLUMN usuario TEXT")
     except:
         pass
 
