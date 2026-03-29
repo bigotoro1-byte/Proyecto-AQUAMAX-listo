@@ -19,7 +19,7 @@ def login():
         conn = conectar()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT * FROM usuarios WHERE username=?", (user,))
+        cursor.execute("SELECT username AS user, password, rol FROM usuarios WHERE username=?", (user,))
         usuario = cursor.fetchone()
 
         conn.close()
