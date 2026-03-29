@@ -1,6 +1,12 @@
 import sqlite3
-import psycopg2
 import os
+
+# 🔥 IMPORT SEGURO (NO ROMPE SI NO EXISTE)
+try:
+    import psycopg2
+except:
+    psycopg2 = None
+
 
 def conectar():
     database_url = os.environ.get("DATABASE_URL")
@@ -28,11 +34,11 @@ def conectar():
 >>>>>>> b10f179 (conexion dual sqlite + postgres)
 
     try:
-        # 🔥 Si hay URL → PostgreSQL (Render)
-        if database_url:
+        # 🔥 Si hay URL y psycopg2 existe → PostgreSQL
+        if database_url and psycopg2:
             return psycopg2.connect(database_url)
 
-        # 💻 Local → SQLite
+        # 💻 Local o fallback → SQLite
         return sqlite3.connect("aquamax.db")
 
     except Exception as e:
