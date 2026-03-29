@@ -65,8 +65,8 @@ def crear_tablas():
 
     # 🔥 USUARIOS
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS usuarios (
-        user TEXT PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS usuarios (
+        username TEXT PRIMARY KEY,
         password TEXT,
         rol TEXT
     )
