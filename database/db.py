@@ -5,7 +5,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_db_path():
-    return os.getenv('DATABASE_URL', 'sqlite:///data/database/inventario.db').replace('sqlite:///', '')
+    raw_url = os.getenv('DATABASE_URL', 'sqlite:///data/database/inventario.db')
+    db_path = raw_url.replace('sqlite:///', '')
+
+    # Asegura que exista el directorio destino antes de conectar SQLite.
+    db_dir = os.path.dirname(db_path)
+    if db_dir:
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+            return db_path
+        except OSError:
+            pass
+
+    # Fallback seguro para entornos donde /var/data no este disponible.
+    fallback_path = os.path.join('data', 'database', 'inventario.db')
+    os.makedirs(os.path.dirname(fallback_path), exist_ok=True)
+    return fallback_path
 
 def conectar():
     return sqlite3.connect(get_db_path())
