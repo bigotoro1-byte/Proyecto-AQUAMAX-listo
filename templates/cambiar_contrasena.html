@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mt-5" style="max-width: 560px;">
+    <div class="card p-4" style="background: rgba(255, 255, 255, 0.95); border-radius: 14px;">
+    <h2 class="mb-3 text-dark">Cambiar contrasena</h2>
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    {% if success %}
+    <div class="alert alert-success">{{ success }}</div>
+    {% endif %}
+
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+            <label class="form-label text-dark fw-semibold">Contrasena actual</label>
+            <input type="password" name="actual" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label text-dark fw-semibold">Contrasena nueva</label>
+            <input type="password" name="nueva" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label text-dark fw-semibold">Confirmar contrasena</label>
+            <input type="password" name="confirmar" class="form-control" required>
+        </div>
+        <button class="btn btn-primary w-100">Actualizar</button>
+    </form>
+
+    <div class="text-center mt-4">
+        <a href="/dashboard" class="btn btn-secondary w-100">Regresar al dashboard</a>
+    </div>
+    </div>
+</div>
+
+{% endblock %}

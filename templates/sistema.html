@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4" style="max-width: 900px;">
+    <h2 class="mb-3">🛡️ Panel de Sistema (Superadmin)</h2>
+    <p class="text-muted">Estas acciones crean respaldo automatico antes de ejecutarse.</p>
+
+    <div class="card p-4 mb-4">
+        <h5>Limpiar inventario</h5>
+        <p class="text-muted">Elimina todos los registros de inventario. No borra productos ni usuarios.</p>
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="limpiar_inventario">
+            <label class="form-label">Escribe <b>LIMPIAR</b> para confirmar</label>
+            <input type="text" name="confirm" class="form-control mb-3" required>
+            <button class="btn btn-warning" type="submit">Limpiar inventario</button>
+        </form>
+    </div>
+
+    <div class="card p-4">
+        <h5>Reiniciar datos del sistema</h5>
+        <p class="text-muted">Elimina inventario, productos y usuarios no protegidos (mantiene admin/superadmin).</p>
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="reiniciar_datos">
+            <label class="form-label">Escribe <b>REINICIAR</b> para confirmar</label>
+            <input type="text" name="confirm" class="form-control mb-3" required>
+            <button class="btn btn-danger" type="submit">Reiniciar sistema</button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

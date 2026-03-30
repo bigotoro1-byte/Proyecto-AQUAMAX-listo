@@ -5,7 +5,7 @@
 body {
     background: 
         linear-gradient(rgba(15,23,42,0.3), rgba(15,23,42,0.3)),
-        url("/static/fondo.jpg") no-repeat center center fixed;
+        url("/static/fondo2.png") no-repeat center center fixed;
     background-size: cover;
 }
 
@@ -19,15 +19,16 @@ body {
 }
 
 .login-container {
-    height: 100vh;
+    min-height: 100dvh;
     background: transparent;
+    padding: 16px;
 }
 
 .login-card {
     background: white;
     border-radius: 12px;
     padding: 30px;
-    width: 350px;
+    width: min(350px, 92vw);
     box-shadow: 0px 10px 30px rgba(0,0,0,0.3);
     position: relative;
     z-index: 1;
@@ -49,13 +50,20 @@ body {
 </div>
 {% endif %}
 
-<form method="POST">
+<form method="POST" action="/login">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-<input type="text" name="user" class="form-control mb-3" placeholder="Usuario" required>
+    <input type="text" name="user" class="form-control mb-3" placeholder="Usuario" required>
 
-<input type="password" name="password" class="form-control mb-3" placeholder="Contraseña" required>
+    <input type="password" name="password" class="form-control mb-3" placeholder="Contraseña" required>
 
-<button type="submit" class="btn btn-primary w-100">Ingresar</button>
+    <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+
+    <div class="text-center mt-3">
+        <a href="/recuperar_contrasena" class="text-muted text-decoration-none" style="font-size: 13px;">
+            ¿Olvidaste tu contraseña?
+        </a>
+    </div>
 
 </form>
 

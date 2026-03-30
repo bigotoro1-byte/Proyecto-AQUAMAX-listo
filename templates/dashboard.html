@@ -2,6 +2,7 @@
 {% block content %}
 
 <h2 class="mb-4">📊 Dashboard</h2>
+<p class="text-muted mb-4">Usuario: {{ session.get('user', 'Invitado') }}</p>
 
 <!-- 🔢 CARDS -->
 <div class="row g-4 mb-4">

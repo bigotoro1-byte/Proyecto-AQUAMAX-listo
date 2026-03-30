@@ -12,6 +12,7 @@
     <!-- CREAR USUARIO -->
     <div class="card p-3 mb-4 shadow">
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="row">
                 <div class="col">
                     <input type="text" name="usuario" class="form-control" placeholder="Usuario">
@@ -24,6 +25,9 @@
                         <option value="">Rol</option>
                         <option value="admin">Admin</option>
                         <option value="trabajador">Trabajador</option>
+                        {% if session.get('rol') == 'superadmin' %}
+                        <option value="superadmin">Superadmin</option>
+                        {% endif %}
                     </select>
                 </div>
                 <div class="col">
@@ -49,10 +53,11 @@
                     <td>{{ u[0] }}</td>
                     <td>{{ u[2] }}</td>
                     <td>
-                        {% if u[0] != "admin" %}
-                        <a href="/admin/usuarios/eliminar/{{ u[0] }}" class="btn btn-danger btn-sm">
-                            Eliminar
-                        </a>
+                        {% if u[0] not in ["admin", "superadmin"] %}
+                        <form method="post" action="/admin/usuarios/eliminar/{{ u[0] }}" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
+                        </form>
                         {% endif %}
                     </td>
                 </tr>

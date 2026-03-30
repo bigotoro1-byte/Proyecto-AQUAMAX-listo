@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4" style="max-width: 900px;">
+    <h2 class="mb-3">⚙️ Ajustes de stock</h2>
+    <p class="text-muted">Configura minimos y umbrales sin tocar codigo.</p>
+
+    <div class="card p-4">
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Minimo cantidad entrada</label>
+                    <input type="number" step="0.01" min="0.01" name="min_cantidad_entrada" class="form-control" value="{{ cfg.min_cantidad_entrada }}" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Minimo cantidad salida</label>
+                    <input type="number" step="0.01" min="0.01" name="min_cantidad_salida" class="form-control" value="{{ cfg.min_cantidad_salida }}" required>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Umbral critico (rojo)</label>
+                    <input type="number" step="0.01" min="0" name="umbral_critico" class="form-control" value="{{ cfg.umbral_critico }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Umbral medio (amarillo)</label>
+                    <input type="number" step="0.01" min="0" name="umbral_medio" class="form-control" value="{{ cfg.umbral_medio }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Umbral alerta dashboard</label>
+                    <input type="number" step="0.01" min="0" name="umbral_alerta_dashboard" class="form-control" value="{{ cfg.umbral_alerta_dashboard }}" required>
+                </div>
+            </div>
+
+            <button class="btn btn-primary mt-4" type="submit">Guardar ajustes</button>
+
+            <hr class="my-4">
+            <h5 class="mb-3">Umbrales por producto en stock (GENERAL)</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Producto</th>
+                            <th>Stock GENERAL</th>
+                            <th>Critico (rojo)</th>
+                            <th>Medio (amarillo)</th>
+                            <th>Alerta dashboard</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if productos_en_stock %}
+                            {% for p in productos_en_stock %}
+                            <tr>
+                                <td class="fw-semibold">{{ p[1] }}</td>
+                                <td>{{ p[2] }}</td>
+                                <td>
+                                    <input type="number" step="0.01" min="0" class="form-control" name="umbral_critico__{{ p[0] }}" value="{{ p[3] }}" required>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" min="0" class="form-control" name="umbral_medio__{{ p[0] }}" value="{{ p[4] }}" required>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" min="0" class="form-control" name="umbral_alerta_dashboard__{{ p[0] }}" value="{{ p[5] }}" required>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">No hay productos con stock en GENERAL para configurar.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

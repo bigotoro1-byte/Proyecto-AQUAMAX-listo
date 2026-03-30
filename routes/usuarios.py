@@ -1,16 +1,26 @@
-from flask import Blueprint, render_template, request, redirect, session
-from database.db import conectar
+from flask import Blueprint, render_template, request, redirect, session, flash
+from database.db import conectar, get_db_path, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto
 from werkzeug.security import generate_password_hash
+from datetime import datetime
+import os
+import shutil
+import re
 
 usuarios_bp = Blueprint("usuarios", __name__, url_prefix="/admin")
+
+
+def password_es_fuerte(password):
+    if not password or len(password) < 8:
+        return False
+    return bool(re.search(r"[A-Za-z]", password) and re.search(r"\d", password))
 
 
 # 🔐 LISTAR Y CREAR USUARIOS
 @usuarios_bp.route("/usuarios", methods=["GET", "POST"])
 def usuarios():
 
-    if "rol" not in session or session["rol"] != "admin":
-        return "No tienes permisos"
+    if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
+        return render_template("acceso_denegado.html"), 403
 
     conn = conectar()
     cursor = conn.cursor()
@@ -23,6 +33,12 @@ def usuarios():
 
         if not user or not password or not rol:
             return render_template("usuarios.html", error="Completa todos los campos")
+
+        if not password_es_fuerte(password):
+            return render_template("usuarios.html", error="La contraseña debe tener al menos 8 caracteres, letras y numeros")
+
+        if rol == "superadmin" and session.get("rol") != "superadmin":
+            return render_template("usuarios.html", error="Solo superadmin puede crear otro superadmin")
 
         try:
             cursor.execute(
@@ -43,17 +59,148 @@ def usuarios():
 
 
 # 🗑️ ELIMINAR USUARIO
-@usuarios_bp.route("/usuarios/eliminar/<user>")
+@usuarios_bp.route("/usuarios/eliminar/<user>", methods=["POST"])
 def eliminar_usuario(user):
 
-    if "rol" not in session or session["rol"] != "admin":
-        return "No tienes permisos"
+    if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
+        return render_template("acceso_denegado.html"), 403
+
+    if user in ("admin", "superadmin"):
+        flash("No puedes eliminar usuarios protegidos", "error")
+        return redirect("/admin/usuarios")
 
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM usuarios WHERE user=?", (user,))
+    cursor.execute("DELETE FROM usuarios WHERE username=?", (user,))
     conn.commit()
     conn.close()
 
     return redirect("/admin/usuarios")
+
+
+def _crear_respaldo_db():
+    db_path = get_db_path()
+    os.makedirs("backups", exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = os.path.join("backups", f"inventario_backup_{stamp}.db")
+    shutil.copy2(db_path, backup_path)
+    return backup_path
+
+
+@usuarios_bp.route("/sistema", methods=["GET", "POST"])
+def sistema():
+    if "rol" not in session or session["rol"] != "superadmin":
+        return render_template("acceso_denegado.html"), 403
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        confirm = (request.form.get("confirm", "") or "").strip().upper()
+
+        try:
+            backup_path = _crear_respaldo_db()
+        except Exception as e:
+            flash(f"No se pudo crear respaldo: {str(e)}", "error")
+            return redirect("/admin/sistema")
+
+        conn = conectar()
+        cursor = conn.cursor()
+
+        try:
+            if action == "limpiar_inventario":
+                if confirm != "LIMPIAR":
+                    flash("Confirmacion invalida. Escribe LIMPIAR.", "error")
+                    return redirect("/admin/sistema")
+
+                cursor.execute("DELETE FROM inventario")
+                conn.commit()
+                flash(f"Inventario limpiado. Respaldo: {backup_path}", "success")
+
+            elif action == "reiniciar_datos":
+                if confirm != "REINICIAR":
+                    flash("Confirmacion invalida. Escribe REINICIAR.", "error")
+                    return redirect("/admin/sistema")
+
+                cursor.execute("DELETE FROM inventario")
+                cursor.execute("DELETE FROM productos")
+                cursor.execute("DELETE FROM usuarios WHERE rol NOT IN ('admin', 'superadmin')")
+                conn.commit()
+                flash(f"Datos reiniciados correctamente. Respaldo: {backup_path}", "success")
+
+            else:
+                flash("Accion no valida", "error")
+
+        except Exception as e:
+            conn.rollback()
+            flash(f"Error ejecutando accion: {str(e)}", "error")
+        finally:
+            conn.close()
+
+        return redirect("/admin/sistema")
+
+    return render_template("sistema.html")
+
+
+@usuarios_bp.route("/ajustes-stock", methods=["GET", "POST"])
+def ajustes_stock():
+    if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
+        return render_template("acceso_denegado.html"), 403
+
+    if request.method == "POST":
+        try:
+            min_entrada = float(request.form.get("min_cantidad_entrada", "0.01"))
+            min_salida = float(request.form.get("min_cantidad_salida", "0.01"))
+            umbral_critico = float(request.form.get("umbral_critico", "5"))
+            umbral_medio = float(request.form.get("umbral_medio", "15"))
+            umbral_alerta_dashboard = float(request.form.get("umbral_alerta_dashboard", "10"))
+        except ValueError:
+            flash("Valores invalidos. Usa solo numeros.", "error")
+            return redirect("/admin/ajustes-stock")
+
+        if min_entrada <= 0 or min_salida <= 0:
+            flash("Los minimos deben ser mayores a 0.", "error")
+            return redirect("/admin/ajustes-stock")
+
+        if umbral_critico < 0 or umbral_medio < 0 or umbral_alerta_dashboard < 0:
+            flash("Los umbrales no pueden ser negativos.", "error")
+            return redirect("/admin/ajustes-stock")
+
+        if umbral_critico > umbral_medio:
+            flash("El umbral critico no puede ser mayor que el umbral medio.", "error")
+            return redirect("/admin/ajustes-stock")
+
+        set_configuracion_stock({
+            "min_cantidad_entrada": min_entrada,
+            "min_cantidad_salida": min_salida,
+            "umbral_critico": umbral_critico,
+            "umbral_medio": umbral_medio,
+            "umbral_alerta_dashboard": umbral_alerta_dashboard,
+        })
+
+        # Guardar ajustes por producto en stock
+        productos_en_stock = get_configuracion_stock_productos_en_stock()
+        for p in productos_en_stock:
+            pid = p[0]
+            try:
+                p_critico = float(request.form.get(f"umbral_critico__{pid}", str(umbral_critico)))
+                p_medio = float(request.form.get(f"umbral_medio__{pid}", str(umbral_medio)))
+                p_alerta = float(request.form.get(f"umbral_alerta_dashboard__{pid}", str(umbral_alerta_dashboard)))
+            except ValueError:
+                flash(f"Valor invalido en producto {p[1]}", "error")
+                return redirect("/admin/ajustes-stock")
+
+            if p_critico < 0 or p_medio < 0 or p_alerta < 0:
+                flash(f"Umbrales negativos no permitidos en {p[1]}", "error")
+                return redirect("/admin/ajustes-stock")
+            if p_critico > p_medio:
+                flash(f"El umbral critico no puede ser mayor al medio en {p[1]}", "error")
+                return redirect("/admin/ajustes-stock")
+
+            set_configuracion_stock_producto(pid, p_critico, p_medio, p_alerta)
+
+        flash("Ajustes de stock actualizados correctamente.", "success")
+        return redirect("/admin/ajustes-stock")
+
+    cfg = get_configuracion_stock()
+    productos_en_stock = get_configuracion_stock_productos_en_stock()
+    return render_template("ajustes_stock.html", cfg=cfg, productos_en_stock=productos_en_stock)

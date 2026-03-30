@@ -1,81 +1,117 @@
-from flask import Blueprint, render_template, request, session, redirect
-from database.db import conectar
+from flask import Blueprint, render_template, request, session, redirect, flash
+from database.db import conectar, get_productos, insert_inventario, get_inventario, get_stock_actual, get_stock_general_por_producto, get_configuracion_stock, get_configuracion_stock_producto_map_por_nombre, descontar_stock, insert_movimiento, get_movimientos_salida
 from datetime import datetime
 from routes.utils import login_required
+from flask_wtf import FlaskForm
+from wtforms import StringField, FloatField, SelectField
+from wtforms.validators import DataRequired, NumberRange
 
-inventario_bp = Blueprint("inventario", __name__)
+inventario_bp = Blueprint('inventario', __name__)
 
-@inventario_bp.route("/inventario", methods=["GET","POST"])
+class EntradaForm(FlaskForm):
+    producto = SelectField('Producto', validators=[DataRequired()])
+    cantidad = FloatField('Cantidad', validators=[DataRequired(), NumberRange(min=0.01)])
+
+class SalidaForm(FlaskForm):
+    producto = SelectField('Producto', validators=[DataRequired()])
+    cantidad = FloatField('Cantidad', validators=[DataRequired(), NumberRange(min=0.01)])
+    ubicacion = SelectField('Ubicación', choices=[('Piscina', 'Piscina'), ('Pasillos', 'Pasillos'), ('Oficinas', 'Oficinas'), ('Otros', 'Otros')], validators=[DataRequired()])
+
+@inventario_bp.route('/inventario', methods=['GET','POST'])
 @login_required
 def inventario():
+    entrada_form = EntradaForm()
+    salida_form = SalidaForm()
 
-    conn = conectar()
-    cursor = conn.cursor()
+    productos_db = get_productos()
+    cfg = get_configuracion_stock()
+    choices = [(p[0], p[1]) for p in productos_db]
+    entrada_form.producto.choices = choices
+    salida_form.producto.choices = choices
 
-    if request.method == "POST":
+    if entrada_form.validate_on_submit():
+        producto_id = entrada_form.producto.data
+        cantidad = entrada_form.cantidad.data
+        usuario = session.get('user')
 
-        producto = request.form.get("producto")
-        cantidad = float(request.form.get("cantidad") or 0)
+        if cantidad is None or float(cantidad) < cfg['min_cantidad_entrada']:
+            flash(f'Cantidad invalida. Minimo permitido para entrada: {cfg["min_cantidad_entrada"]}', 'error')
+            return redirect('/inventario')
 
-        # 🔥 SIEMPRE GENERAL
-        piscina = "GENERAL"
+        try:
+            insert_inventario(producto_id, cantidad, 'GENERAL', datetime.now().strftime('%Y-%m-%d %H:%M:%S'), usuario)
+            insert_movimiento(producto_id, 'ENTRADA', cantidad, 'GENERAL', datetime.now().strftime('%Y-%m-%d %H:%M:%S'), usuario)
+            flash('Entrada registrada exitosamente', 'success')
+        except Exception as e:
+            flash(f'Error al registrar entrada: {str(e)}', 'error')
 
-        cursor.execute(
-            "INSERT INTO inventario (producto, cantidad, piscina) VALUES (?, ?, ?)",
-            (producto, cantidad, piscina)
-        )
-        conn.commit()
+        return redirect('/inventario')
 
-    cursor.execute("SELECT nombre FROM productos")
-    productos = cursor.fetchall()
-
-    cursor.execute("""
-        SELECT producto, piscina, SUM(cantidad), usuario
-        FROM inventario
-        GROUP BY producto, piscina, usuario
-        """)
-    stock_actual = cursor.fetchall()
-
-    if session.get("rol") == "admin":
-        cursor.execute("SELECT * FROM inventario")
+    stock_actual = get_stock_actual()
+    umbrales_por_producto = get_configuracion_stock_producto_map_por_nombre()
+    stock_general_map = get_stock_general_por_producto()
+    if session.get('rol') == 'admin':
+        retiros = get_movimientos_salida(10)
     else:
-        cursor.execute("SELECT * FROM inventario WHERE usuario=?", (session["user"],))
+        retiros = get_movimientos_salida(10, session.get('user'))
 
-    datos = cursor.fetchall()
-    conn.close()
+    if session.get('rol') == 'admin':
+        datos = get_inventario()
+    else:
+        datos = get_inventario(session['user'])
 
     return render_template(
-        "inventario.html",
+        'inventario.html',
         datos=datos,
         stock_actual=stock_actual,
-        productos=productos
+        productos=productos_db,
+        entrada_form=entrada_form,
+        salida_form=salida_form,
+        retiros=retiros,
+        stock_general_map=stock_general_map,
+        umbral_critico=cfg['umbral_critico'],
+        umbral_medio=cfg['umbral_medio'],
+        min_salida=cfg['min_cantidad_salida'],
+        umbrales_por_producto=umbrales_por_producto
     )
 
-@inventario_bp.route("/salida", methods=["POST"])
+@inventario_bp.route('/salida', methods=['POST'])
+@login_required
 def salida():
+    salida_form = SalidaForm()
 
-    producto = request.form.get("producto")
-    cantidad = float(request.form.get("cantidad") or 0)
-    ubicacion = request.form.get("ubicacion")
-    usuario = session.get("user")
+    productos_db = get_productos()
+    cfg = get_configuracion_stock()
+    salida_form.producto.choices = [(p[0], p[1]) for p in productos_db]
 
-    conn = conectar()
-    cursor = conn.cursor()
+    if salida_form.validate_on_submit():
+        producto_id = salida_form.producto.data
+        cantidad = salida_form.cantidad.data
+        ubicacion = salida_form.ubicacion.data
+        usuario = session.get('user')
 
-    # 🔥 descontar del GENERAL
-    cursor.execute("""
-    UPDATE inventario
-    SET cantidad = cantidad - ?
-    WHERE producto=? AND piscina='GENERAL'
-    """, (cantidad, producto))
+        if cantidad is None or float(cantidad) < cfg['min_cantidad_salida']:
+            flash(f'Cantidad invalida. Minimo permitido para salida: {cfg["min_cantidad_salida"]}', 'error')
+            return redirect('/inventario')
 
-    # 🔥 registrar movimiento
-    cursor.execute("""
-    INSERT INTO inventario (producto, cantidad, piscina, usuario)
-    VALUES (?, ?, ?, ?)
-    """, (producto, cantidad, ubicacion, usuario))
+        conn = conectar()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT IFNULL(SUM(cantidad), 0) FROM inventario WHERE producto = ? AND piscina = 'GENERAL'",
+            (producto_id,)
+        )
+        stock_general = float(cursor.fetchone()[0] or 0)
+        conn.close()
 
-    conn.commit()
-    conn.close()
+        if stock_general < cantidad:
+            flash(f'Stock insuficiente en GENERAL. Disponible: {stock_general}', 'error')
+            return redirect('/inventario')
 
-    return redirect("/inventario")
+        try:
+            descontar_stock(producto_id, cantidad, usuario)
+            insert_movimiento(producto_id, 'SALIDA', cantidad, ubicacion, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), usuario)
+            flash(f'Salida registrada exitosamente (destino: {ubicacion})', 'success')
+        except Exception as e:
+            flash(f'Error al registrar salida: {str(e)}', 'error')
+
+    return redirect('/inventario')

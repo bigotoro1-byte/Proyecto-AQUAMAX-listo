@@ -13,19 +13,29 @@
 <h5 class="text-success mb-3">➕ Agregar stock</h5>
 
 <form method="post">
+    {{ entrada_form.hidden_tag() }}
 
-<label class="form-label">Producto</label>
-<select name="producto" class="form-select mb-2">
-{% for p in productos %}
-<option>{{p[0]}}</option>
-{% endfor %}
-</select>
+    <div class="mb-3">
+        {{ entrada_form.producto.label(class="form-label") }}
+        {{ entrada_form.producto(class="form-select") }}
+        {% if entrada_form.producto.errors %}
+            <div class="text-danger small">
+                {% for error in entrada_form.producto.errors %}{{ error }}{% endfor %}
+            </div>
+        {% endif %}
+    </div>
 
-<label class="form-label">Cantidad</label>
-<input name="cantidad" class="form-control mb-3" placeholder="Ej: 10">
+    <div class="mb-3">
+        {{ entrada_form.cantidad.label(class="form-label") }}
+        {{ entrada_form.cantidad(class="form-control", placeholder="Ej: 10") }}
+        {% if entrada_form.cantidad.errors %}
+            <div class="text-danger small">
+                {% for error in entrada_form.cantidad.errors %}{{ error }}{% endfor %}
+            </div>
+        {% endif %}
+    </div>
 
-<button class="btn btn-success w-100">Agregar</button>
-
+    <button class="btn btn-success w-100">Agregar</button>
 </form>
 
 </div>
@@ -39,27 +49,40 @@
 <h5 class="text-danger mb-3">➖ Retirar producto</h5>
 
 <form action="/salida" method="post">
+    {{ salida_form.hidden_tag() }}
 
-<label class="form-label">Producto</label>
-<select name="producto" class="form-select mb-2">
-{% for p in productos %}
-<option>{{p[0]}}</option>
-{% endfor %}
-</select>
+    <div class="mb-3">
+        {{ salida_form.producto.label(class="form-label") }}
+        {{ salida_form.producto(class="form-select") }}
+        <div class="small text-muted mt-1" id="stock-disponible-general">Disponible en GENERAL: --</div>
+        {% if salida_form.producto.errors %}
+            <div class="text-danger small">
+                {% for error in salida_form.producto.errors %}{{ error }}{% endfor %}
+            </div>
+        {% endif %}
+    </div>
 
-<label class="form-label">Cantidad</label>
-<input name="cantidad" class="form-control mb-2" placeholder="Ej: 5">
+    <div class="mb-3">
+        {{ salida_form.cantidad.label(class="form-label") }}
+        {{ salida_form.cantidad(class="form-control", placeholder="Ej: 5", min=min_salida) }}
+        {% if salida_form.cantidad.errors %}
+            <div class="text-danger small">
+                {% for error in salida_form.cantidad.errors %}{{ error }}{% endfor %}
+            </div>
+        {% endif %}
+    </div>
 
-<label class="form-label">Ubicación</label>
-<select name="ubicacion" class="form-select mb-3">
-<option value="Piscina">Piscina</option>
-<option value="Pasillos">Pasillos</option>
-<option value="Oficinas">Oficinas</option>
-<option value="Otros">Otros</option>
-</select>
+    <div class="mb-3">
+        {{ salida_form.ubicacion.label(class="form-label") }}
+        {{ salida_form.ubicacion(class="form-select") }}
+        {% if salida_form.ubicacion.errors %}
+            <div class="text-danger small">
+                {% for error in salida_form.ubicacion.errors %}{{ error }}{% endfor %}
+            </div>
+        {% endif %}
+    </div>
 
-<button class="btn btn-danger w-100">Retirar</button>
-
+    <button class="btn btn-danger w-100">Retirar</button>
 </form>
 
 </div>
@@ -89,18 +112,22 @@
 <td class="fw-semibold">{{s[0]}}</td>
 <td>{{s[1]}}</td>
 
+{% set p_cfg = umbrales_por_producto.get(s[0], {}) %}
+{% set p_crit = p_cfg.get('umbral_critico', umbral_critico) %}
+{% set p_med = p_cfg.get('umbral_medio', umbral_medio) %}
+
 <!-- RESULTADO
 Ahora tu sistema muestra:
 🔴 0–5 → crítico (rojo)
 🟡 6–15 → medio (amarillo)
 🟢 16+ → óptimo (verde) -->
 <td class="text-center">
-{% if s[2] <= 5 %}
+{% if s[2] <= p_crit %}
 <span class="badge bg-danger fs-6 px-3 py-2">
 {{s[2]}}
 </span>
 
-{% elif s[2] <= 15 %}
+{% elif s[2] <= p_med %}
 <span class="badge bg-warning text-dark fs-6 px-3 py-2">
 {{s[2]}}
 </span>
@@ -123,6 +150,63 @@ Ahora tu sistema muestra:
 </div>
 </div>
 
+<div class="row g-4 mt-1">
+    <div class="col-12">
+        <div class="card p-4">
+            <h5 class="mb-3 text-danger">📉 Ultimos retiros</h5>
+            <div class="table-responsive">
+                <table class="table table-hover tabla-pro">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Producto</th>
+                            <th>Tipo</th>
+                            <th class="text-center">Cantidad</th>
+                            <th>Ubicacion destino</th>
+                            <th>Fecha</th>
+                            <th>Usuario</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if retiros %}
+                            {% for r in retiros %}
+                            <tr>
+                                <td class="fw-semibold">{{ r[0] }}</td>
+                                <td><span class="badge bg-danger">{{ r[1] }}</span></td>
+                                <td class="text-center"><span class="badge bg-danger">-{{ r[2] }}</span></td>
+                                <td>{{ r[3] }}</td>
+                                <td>{{ r[4] }}</td>
+                                <td>{{ r[5] }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">No hay retiros registrados</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
+
+</div>
+
+<script>
+const stockGeneralMap = {{ stock_general_map|tojson }};
+const productoSelect = document.getElementById("{{ salida_form.producto.id }}");
+const stockInfo = document.getElementById("stock-disponible-general");
+
+function actualizarStockDisponible() {
+    const productId = productoSelect ? productoSelect.value : null;
+    const disponible = productId && stockGeneralMap[productId] !== undefined ? stockGeneralMap[productId] : 0;
+    stockInfo.textContent = `Disponible en GENERAL: ${disponible}`;
+}
+
+if (productoSelect && stockInfo) {
+    productoSelect.addEventListener("change", actualizarStockDisponible);
+    actualizarStockDisponible();
+}
+</script>
 
 {% endblock %}

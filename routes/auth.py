@@ -1,8 +1,28 @@
-from flask import Blueprint, render_template, request, redirect, session
-from database.db import conectar
-from werkzeug.security import check_password_hash
+from flask import Blueprint, render_template, request, redirect, session, current_app
+from database.db import conectar, actualizar_contrasena
+from werkzeug.security import check_password_hash, generate_password_hash
+import random
+import string
+from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import os
+import time
 
 auth_bp = Blueprint("auth", __name__)
+
+FAILED_LOGINS = {}
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_SECONDS = 300
+
+
+def password_es_fuerte(password):
+    if len(password) < 8:
+        return False
+    has_letter = any(c.isalpha() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    return has_letter and has_digit
 
 @auth_bp.route("/", methods=["GET", "POST"])
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -16,20 +36,49 @@ def login():
         if not user or not password:
             return render_template("login.html", error="Completa todos los campos")
 
+        key = (user or "").strip().lower()
+        state = FAILED_LOGINS.get(key, {"count": 0, "until": 0})
+        now = time.time()
+        if state.get("until", 0) > now:
+            wait = int(state["until"] - now)
+            return render_template("login.html", error=f"Cuenta bloqueada temporalmente. Intenta en {wait}s")
+
         conn = conectar()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT * FROM usuarios WHERE username=%s", (user,))
+        cursor.execute("SELECT * FROM usuarios WHERE username=?", (user,))
         usuario = cursor.fetchone()
 
         conn.close()
 
         if usuario and check_password_hash(usuario[1], password):
+            FAILED_LOGINS.pop(key, None)
             session["user"] = user
             session["rol"] = usuario[2]
             return redirect("/dashboard")
 
-        return render_template("login.html", error="Credenciales incorrectas")
+        # Incrementar intentos fallidos
+        state["count"] = state.get("count", 0) + 1
+        if state["count"] >= MAX_LOGIN_ATTEMPTS:
+            state["until"] = now + LOCKOUT_SECONDS
+            state["count"] = 0
+        FAILED_LOGINS[key] = state
+
+        current_app.logger.warning(f"Login fallido: user={user}, exists={bool(usuario)}")
+
+        # Mensaje de error simplificado (producción seguro)
+        if not usuario:
+            error_message = "Credenciales incorrectas"
+        else:
+            error_message = "Credenciales incorrectas"
+            # En modo depuración solo para admin puedes añadir contexto:
+            if usuario[2] == "admin":
+                error_message = "Credenciales incorrectas. Si eres admin y no recuerdas tu contraseña, restaura tu .env"
+
+        return render_template("login.html", error=error_message)
+
+    if session.get("user"):
+        return redirect("/dashboard")
 
     return render_template("login.html")
 
@@ -38,3 +87,145 @@ def login():
 def logout():
     session.clear()
     return redirect("/login")
+
+
+@auth_bp.route('/cambiar_contrasena', methods=['GET', 'POST'])
+def cambiar_contrasena():
+    if 'user' not in session:
+        return redirect('/login')
+
+    if request.method == 'POST':
+        actual = request.form.get('actual')
+        nueva = request.form.get('nueva')
+        confirmar = request.form.get('confirmar')
+
+        if not actual or not nueva or not confirmar:
+            return render_template('cambiar_contrasena.html', error='Completa todos los campos')
+
+        if nueva != confirmar:
+            return render_template('cambiar_contrasena.html', error='Las contraseñas no coinciden')
+
+        if not password_es_fuerte(nueva):
+            return render_template('cambiar_contrasena.html', error='La contraseña debe tener al menos 8 caracteres, letras y numeros')
+
+        conn = conectar()
+        cursor = conn.cursor()
+        cursor.execute('SELECT password FROM usuarios WHERE username = ?', (session['user'],))
+        usuario = cursor.fetchone()
+        conn.close()
+
+        if not usuario or not check_password_hash(usuario[0], actual):
+            return render_template('cambiar_contrasena.html', error='Contraseña actual incorrecta')
+
+        actualizar_contrasena(session['user'], generate_password_hash(nueva))
+        return render_template('cambiar_contrasena.html', success='Contraseña actualizada correctamente')
+
+    return render_template('cambiar_contrasena.html')
+
+
+@auth_bp.route('/recuperar_contrasena', methods=['GET', 'POST'])
+def recuperar_contrasena():
+    if request.method == 'POST':
+        step = request.form.get('step', '1')
+
+        if step == '1':
+            # Paso 1: Usuario solicita código
+            user = request.form.get('user')
+            email = request.form.get('email')
+
+            if not user or not email:
+                return render_template('recuperar_contrasena.html', error='Completa usuario y correo', step=1)
+
+            conn = conectar()
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM usuarios WHERE username = ?', (user,))
+            usuario = cursor.fetchone()
+            conn.close()
+
+            if not usuario:
+                return render_template('recuperar_contrasena.html', error='Usuario no existe', step=1)
+
+            # Generar código de 6 dígitos
+            codigo = ''.join(random.choices(string.digits, k=6))
+            session['recovery_user'] = user
+            session['recovery_code'] = codigo
+            session['recovery_email'] = email
+            session['recovery_code_time'] = datetime.now().timestamp()
+
+            # Enviar email con el código
+            try:
+                from dotenv import load_dotenv
+                load_dotenv()
+                
+                mail_server = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+                mail_port = int(os.getenv('MAIL_PORT', 587))
+                mail_user = os.getenv('MAIL_USERNAME')
+                mail_pass = os.getenv('MAIL_PASSWORD')
+                mail_from = os.getenv('MAIL_FROM', 'aquamax@tuempresa.com')
+                
+                # Crear mensaje con UTF-8
+                msg = MIMEMultipart('alternative')
+                msg['Subject'] = 'Codigo de recuperacion AQUAMAX'
+                msg['From'] = mail_from
+                msg['To'] = email
+                
+                cuerpo = f'Hola {user},\n\nTu codigo de recuperacion es: {codigo}\n\nEste codigo expira en 15 minutos.\n\nSi no solicitaste esto, ignora este mensaje.'
+                msg_text = MIMEText(cuerpo, 'plain', 'utf-8')
+                msg.attach(msg_text)
+                
+                # Enviar por SMTP
+                server = smtplib.SMTP(mail_server, mail_port)
+                server.starttls()
+                server.login(mail_user, mail_pass)
+                server.send_message(msg)
+                server.quit()
+                
+                session['recovery_attempts'] = 0
+                return render_template('recuperar_contrasena.html', success='Se envio un codigo a tu correo', step=2)
+            except Exception as e:
+                current_app.logger.error(f'Error enviando email: {str(e)}')
+                return render_template('recuperar_contrasena.html', error='No se pudo enviar el codigo. Verifica configuracion de correo.', step=1)
+
+        elif step == '2':
+            # Paso 2: Usuario ingresa código y nueva contraseña
+            codigo = request.form.get('codigo')
+            nueva = request.form.get('nueva')
+            confirmar = request.form.get('confirmar')
+
+            if not session.get('recovery_user'):
+                return render_template('recuperar_contrasena.html', error='Sesión expirada', step=1)
+
+            ts = session.get('recovery_code_time', 0)
+            if (time.time() - ts) > 900:
+                session.pop('recovery_user', None)
+                session.pop('recovery_code', None)
+                session.pop('recovery_attempts', None)
+                return render_template('recuperar_contrasena.html', error='El codigo expiro. Solicita uno nuevo.', step=1)
+
+            if not codigo or not nueva or not confirmar:
+                return render_template('recuperar_contrasena.html', error='Completa todos los campos', step=2)
+
+            if codigo != session.get('recovery_code'):
+                session['recovery_attempts'] = session.get('recovery_attempts', 0) + 1
+                if session['recovery_attempts'] >= 5:
+                    session.pop('recovery_user', None)
+                    session.pop('recovery_code', None)
+                    session.pop('recovery_attempts', None)
+                    return render_template('recuperar_contrasena.html', error='Demasiados intentos. Solicita un nuevo codigo.', step=1)
+                return render_template('recuperar_contrasena.html', error='Código incorrecto', step=2)
+
+            if nueva != confirmar:
+                return render_template('recuperar_contrasena.html', error='Las contraseñas no coinciden', step=2)
+
+            if not password_es_fuerte(nueva):
+                return render_template('recuperar_contrasena.html', error='La contraseña debe tener al menos 8 caracteres, letras y numeros', step=2)
+
+            # Actualizar contraseña
+            actualizar_contrasena(session['recovery_user'], generate_password_hash(nueva))
+            session.pop('recovery_user', None)
+            session.pop('recovery_code', None)
+            session.pop('recovery_attempts', None)
+
+            return render_template('recuperar_contrasena.html', success='Contraseña actualizada. Ya puedes iniciar sesión', step=1)
+
+    return render_template('recuperar_contrasena.html', step=1)

@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, session, redirect
-from database.db import conectar
+from database.db import conectar, get_configuracion_stock, get_configuracion_stock_producto_map_por_nombre
 from routes.utils import login_required
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -17,22 +17,30 @@ def dashboard():
     cursor.execute("SELECT COUNT(*) FROM productos")
     total_productos = cursor.fetchone()[0] or 0
 
+    cfg = get_configuracion_stock()
+    cfg_prod = get_configuracion_stock_producto_map_por_nombre()
+
     cursor.execute("""
-    SELECT producto, SUM(cantidad)
-    FROM inventario GROUP BY producto
+    SELECT p.nombre, IFNULL(SUM(i.cantidad), 0)
+    FROM productos p
+    LEFT JOIN inventario i ON p.id = i.producto
+    GROUP BY p.id, p.nombre
+    HAVING IFNULL(SUM(i.cantidad), 0) > 0
     """)
     data = cursor.fetchall()
 
     productos = [d[0] for d in data]
     cantidades = [d[1] for d in data]
 
-    cursor.execute("""
-    SELECT producto, SUM(cantidad)
-    FROM inventario
-    GROUP BY producto
-    HAVING SUM(cantidad) < 10
-    """)
-    alertas = cursor.fetchall()
+    alertas = [
+        item for item in data
+        if item[1] < cfg_prod.get(item[0], {}).get('umbral_alerta_dashboard', cfg['umbral_alerta_dashboard'])
+    ]
+
+    stock_bajo = len(alertas)
+
+    # Resumen rápido: top 5 productos por cantidad (mayor > menor)
+    resumen = sorted(data, key=lambda x: x[1], reverse=True)[:5]
 
     conn.close()
 
@@ -42,7 +50,9 @@ def dashboard():
         total_productos=total_productos,
         productos=productos,
         cantidades=cantidades,
-        alertas=alertas
+        alertas=alertas,
+        stock_bajo=stock_bajo,
+        resumen=resumen
     )
 
 from flask import request
@@ -53,6 +63,8 @@ def reporte():
 
     conn = conectar()
     cursor = conn.cursor()
+    usuario_actual = session.get("user")
+    rol_actual = session.get("rol")
 
     # 🔽 obtener filtros
     producto = request.args.get("producto")
@@ -62,14 +74,18 @@ def reporte():
     cursor.execute("SELECT nombre FROM productos")
     lista_productos = [p[0] for p in cursor.fetchall()]
 
-    cursor.execute("SELECT DISTINCT piscina FROM inventario")
+    cursor.execute("""
+        SELECT DISTINCT ubicacion FROM movimientos
+        UNION
+        SELECT DISTINCT piscina FROM inventario
+    """)
     lista_ubicaciones = [u[0] for u in cursor.fetchall() if u[0]]
 
     # 🔽 query principal
     query = """
         SELECT p.nombre, IFNULL(i.piscina, 'Sin movimiento'), IFNULL(SUM(i.cantidad), 0)
         FROM productos p
-        LEFT JOIN inventario i ON p.nombre = i.producto
+        LEFT JOIN inventario i ON p.id = i.producto
         WHERE 1=1
     """
 
@@ -88,11 +104,34 @@ def reporte():
     cursor.execute(query, params)
     datos = cursor.fetchall()
 
+    # Movimientos detallados (admin ve todos, otros usuarios solo los propios)
+    mov_query = """
+        SELECT COALESCE(p.nombre, m.producto), m.ubicacion, m.tipo, m.cantidad, m.fecha, m.usuario
+        FROM movimientos m
+        LEFT JOIN productos p ON p.id = m.producto
+        WHERE 1=1
+    """
+    mov_params = []
+    if rol_actual != "admin":
+        mov_query += " AND m.usuario = ?"
+        mov_params.append(usuario_actual)
+    if producto:
+        mov_query += " AND p.nombre = ?"
+        mov_params.append(producto)
+    if ubicacion:
+        mov_query += " AND m.ubicacion = ?"
+        mov_params.append(ubicacion)
+    mov_query += " ORDER BY m.id DESC"
+
+    cursor.execute(mov_query, mov_params)
+    movimientos = cursor.fetchall()
+
     conn.close()
 
     return render_template(
         "reporte.html",
         reporte=datos,
+        movimientos=movimientos,
         lista_productos=lista_productos,
         lista_ubicaciones=lista_ubicaciones
     )
@@ -117,7 +156,8 @@ def generar_pdf():
     from flask import send_file, request, session
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
     from reportlab.lib import colors
-    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 
     # 📁 carpeta
     if not os.path.exists("reportes"):
@@ -137,78 +177,147 @@ def generar_pdf():
     ubicacion = request.args.get("ubicacion")
 
     query = """
-    SELECT producto, piscina, SUM(cantidad)
-    FROM inventario
+    SELECT COALESCE(p.nombre, i.producto), i.piscina, SUM(i.cantidad)
+    FROM inventario i
+    LEFT JOIN productos p ON p.id = i.producto
     WHERE 1=1
     """
 
     params = []
 
     if producto:
-        query += " AND producto = ?"
+        query += " AND p.nombre = ?"
         params.append(producto)
 
     if ubicacion:
-        query += " AND piscina = ?"
+        query += " AND i.piscina = ?"
         params.append(ubicacion)
 
-    query += " GROUP BY producto, piscina"
+    query += " GROUP BY COALESCE(p.nombre, i.producto), i.piscina"
 
     cursor.execute(query, params)
     datos = cursor.fetchall()
 
+    # Movimientos para PDF (admin ve todos, otros usuarios solo los propios)
+    usuario_actual = session.get("user", "")
+    rol_actual = session.get("rol")
+    mov_query = """
+    SELECT COALESCE(p.nombre, m.producto), m.tipo, m.cantidad, m.ubicacion, m.fecha
+    FROM movimientos m
+    LEFT JOIN productos p ON p.id = m.producto
+    WHERE 1=1
+    """
+    mov_params = []
+
+    if rol_actual != "admin":
+        mov_query += " AND m.usuario = ?"
+        mov_params.append(usuario_actual)
+
+    if producto:
+        mov_query += " AND p.nombre = ?"
+        mov_params.append(producto)
+
+    if ubicacion:
+        mov_query += " AND m.ubicacion = ?"
+        mov_params.append(ubicacion)
+
+    mov_query += " ORDER BY m.id DESC"
+
+    cursor.execute(mov_query, mov_params)
+    movimientos = cursor.fetchall()
+
     conn.close()
 
     # 📄 PDF
-    pdf = SimpleDocTemplate(ruta_pdf)
+    pdf = SimpleDocTemplate(ruta_pdf, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=45, bottomMargin=45)
     styles = getSampleStyleSheet()
+
+    # Estilos adicionales empresariales
+    styles.add(ParagraphStyle(name='HeadingEnterprise', fontSize=18, leading=22, alignment=TA_CENTER, spaceAfter=12, fontName='Helvetica-Bold'))
+    styles.add(ParagraphStyle(name='SubHeadingEnterprise', fontSize=12, leading=15, alignment=TA_CENTER, spaceAfter=18, fontName='Helvetica'))
+    styles.add(ParagraphStyle(name='NormalJustify', fontSize=10, leading=14, alignment=TA_JUSTIFY, fontName='Helvetica'))
+    styles.add(ParagraphStyle(name='MetaInfo', fontSize=9, leading=12, alignment=TA_LEFT, textColor=colors.grey))
 
     elementos = []
 
     # 🖼️ LOGO
     if os.path.exists("static/logo.png"):
-        elementos.append(Image("static/logo.png", width=120, height=60))
+        elementos.append(Image("static/logo.png", width=130, height=65))
 
-    elementos.append(Spacer(1, 10))
+    elementos.append(Spacer(1, 8))
 
-    # 🏢 ENCABEZADO
-    elementos.append(Paragraph("AQUAMAX", styles["Title"]))
-    elementos.append(Paragraph("REPORTE DE INVENTARIO - AQUQMAX", styles["Heading2"]))
-    elementos.append(Spacer(1, 10))
+    # 🏢 ENCABEZADO EMPRESARIAL
+    elementos.append(Paragraph("AQUAMAX S.A.", styles['HeadingEnterprise']))
+    elementos.append(Paragraph("REPORTE DE INVENTARIO", styles['SubHeadingEnterprise']))
+    elementos.append(Paragraph("Empresa: AQUAMAX S.A. | Dirección: Av. Principal 1234 | Tel: (01) 234-5678", styles['MetaInfo']))
 
     # 📌 INFO AUDITORÍA
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M")
     usuario = session.get("user", "Sistema")
 
-    elementos.append(Paragraph(f"Código de reporte: {codigo_reporte}", styles["Normal"]))
-    elementos.append(Paragraph(f"Generado por: {usuario}", styles["Normal"]))
-    elementos.append(Paragraph(f"Fecha: {fecha}", styles["Normal"]))
+    elementos.append(Paragraph(f"Código de reporte: {codigo_reporte}", styles['MetaInfo']))
+    elementos.append(Paragraph(f"Generado por: {usuario}", styles['MetaInfo']))
+    elementos.append(Paragraph(f"Fecha: {fecha}", styles['MetaInfo']))
 
     # 🔍 filtros visibles
     if producto:
-        elementos.append(Paragraph(f"Filtro producto: {producto}", styles["Normal"]))
+        elementos.append(Paragraph(f"Filtro producto: {producto}", styles['MetaInfo']))
     if ubicacion:
-        elementos.append(Paragraph(f"Filtro ubicación: {ubicacion}", styles["Normal"]))
+        elementos.append(Paragraph(f"Filtro ubicación: {ubicacion}", styles['MetaInfo']))
 
-    elementos.append(Spacer(1, 15))
+    elementos.append(Spacer(1, 12))
 
     # 📊 TABLA
     tabla_data = [["Producto", "Ubicación", "Cantidad"]]
 
     for d in datos:
-        tabla_data.append([str(d[0]), str(d[1]), str(d[2])])
+        tabla_data.append([str(d[0]), str(d[1]), f"{float(d[2]):.2f}"])
 
-    tabla = Table(tabla_data)
+    colWidths = [220, 140, 80]
+    tabla = Table(tabla_data, colWidths=colWidths, hAlign='LEFT')
 
     tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#0f172a")),
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#192a56")),
         ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('GRID', (0,0), (-1,-1), 1, colors.grey),
-        ('ALIGN',(0,0),(-1,-1),'CENTER'),
-        ('FONTNAME',(0,0),(-1,0),"Helvetica-Bold"),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 10),
+        ('ALIGN',(0,0),(1,-1),'LEFT'),
+        ('ALIGN', (2,0), (2,-1), 'RIGHT'),
+        ('TEXTCOLOR', (0,1), (-1,-1), colors.HexColor("#1f272d")),
+        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,1), (-1,-1), 9.5),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#dcdde1")),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BACKGROUND', (0,1),(-1,-1), colors.whitesmoke),
     ]))
 
     elementos.append(tabla)
+
+    # 📜 TABLA MOVIMIENTOS DEL USUARIO
+    elementos.append(Spacer(1, 20))
+    elementos.append(Paragraph(f"MOVIMIENTOS DEL USUARIO: {usuario}", styles["Heading3"]))
+
+    mov_data = [["Producto", "Tipo", "Cantidad", "Ubicacion", "Fecha"]]
+    if movimientos:
+        for m in movimientos:
+            mov_data.append([str(m[0]), str(m[1]), str(m[2]), str(m[3]), str(m[4])])
+    else:
+        mov_data.append(["Sin movimientos", "-", "-", "-", "-"])
+
+    mov_table = Table(mov_data, colWidths=[130, 80, 70, 90, 120], hAlign='LEFT')
+    mov_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#0f172a")),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 9),
+        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,1), (-1,-1), 8.5),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#dcdde1")),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('BACKGROUND', (0,1), (-1,-1), colors.whitesmoke),
+    ]))
+    elementos.append(mov_table)
 
     # ✍️ FIRMA
     elementos.append(Spacer(1, 40))

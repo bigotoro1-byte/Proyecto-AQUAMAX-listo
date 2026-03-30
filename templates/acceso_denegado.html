@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-5" style="max-width: 620px;">
+    <div class="card p-4 text-center" style="background: rgba(255,255,255,0.95); border-radius: 14px;">
+        <h2 class="mb-3 text-danger">Acceso denegado</h2>
+        {% if not session.get("user") %}
+        <p class="text-muted mb-4">Debes iniciar sesion para continuar.</p>
+        {% elif session.get("rol") == "superadmin" %}
+        <p class="text-muted mb-2">Tu cuenta tiene acceso amplio, pero esta accion no esta disponible en este contexto.</p>
+        <p class="text-muted mb-4">Verifica si entraste a la opcion correcta desde el menu del sistema.</p>
+        {% elif session.get("rol") == "admin" %}
+        <p class="text-muted mb-2">Esta opcion requiere un nivel de acceso superior.</p>
+        <p class="text-muted mb-4">Si necesitas ejecutar acciones criticas, usa una cuenta superadmin.</p>
+        {% else %}
+        <p class="text-muted mb-2">No tienes permisos para ver esta pagina.</p>
+        <p class="text-muted mb-4">Si crees que esto es un error, solicita acceso a un administrador.</p>
+        {% endif %}
+
+        {% if session.get("user") %}
+        <a href="/dashboard" class="btn btn-primary">Volver al dashboard</a>
+        {% else %}
+        <a href="/login" class="btn btn-primary">Ir al inicio de sesion</a>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

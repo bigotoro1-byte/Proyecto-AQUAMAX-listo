@@ -18,8 +18,9 @@
 {% endif %}
 
 <form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-<input name="codigo" class="form-control mb-2" placeholder="Código">
+<input class="form-control mb-2" placeholder="Código automático" value="{{ codigo_generado if codigo_generado else 'Se genera al guardar' }}" readonly>
 
 <input name="producto" class="form-control mb-2" placeholder="Nombre">
 
@@ -38,6 +39,7 @@
 
 <h5 class="mb-3">Lista de productos</h5>
 
+<div class="table-responsive">
 <table class="table table-hover">
 <thead>
 <tr>
@@ -62,6 +64,7 @@
 </tbody>
 
 </table>
+</div>
 
 </div>
 </div>

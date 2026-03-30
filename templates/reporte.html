@@ -79,6 +79,7 @@ class="btn btn-danger">
 <!-- 📊 TABLA -->
 <div class="card shadow p-4">
 
+<div class="table-responsive">
 <table class="table table-hover table-striped align-middle">
 <thead class="table-dark">
 <tr>
@@ -109,7 +110,43 @@ class="btn btn-danger">
 </tbody>
 
 </table>
+</div>
 
+</div>
+
+<!-- 📜 MOVIMIENTOS -->
+<div class="card shadow p-4 mt-4">
+    <h4>Movimientos</h4>
+    <div class="table-responsive">
+    <table class="table table-hover table-striped align-middle mt-2">
+    <thead class="table-dark">
+    <tr>
+        <th>Producto</th>
+        <th>Ubicación</th>
+        <th>Tipo</th>
+        <th>Cantidad</th>
+        <th>Fecha</th>
+        <th>Usuario</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% if movimientos %}
+        {% for m in movimientos %}
+        <tr>
+            <td>{{ m[0] }}</td>
+            <td>{{ m[1] }}</td>
+            <td>{{ m[2] }}</td>
+            <td>{{ m[3] }}</td>
+            <td>{{ m[4] }}</td>
+            <td>{{ m[5] }}</td>
+        </tr>
+        {% endfor %}
+    {% else %}
+        <tr><td colspan="6" class="text-center text-muted">No hay movimientos registrados</td></tr>
+    {% endif %}
+    </tbody>
+    </table>
+    </div>
 </div>
 
 </div>

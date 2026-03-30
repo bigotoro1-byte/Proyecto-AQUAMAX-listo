@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container mt-5" style="max-width: 560px;">
+    <div class="card p-4" style="background: rgba(255, 255, 255, 0.95); border-radius: 14px;">
+    <h2 class="mb-3 text-dark">Recuperar contrasena</h2>
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    {% if success %}
+    <div class="alert alert-success">{{ success }}</div>
+    {% endif %}
+
+    <!-- PASO 1: Solicitar usuario y email -->
+    {% if step == 1 %}
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="step" value="1">
+        <div class="mb-3">
+            <label class="form-label text-dark fw-semibold">Usuario</label>
+            <input type="text" name="user" class="form-control" required placeholder="Ingresa tu usuario">
+        </div>
+        <div class="mb-3">
+            <label class="form-label text-dark fw-semibold">Correo electronico</label>
+            <input type="email" name="email" class="form-control" required placeholder="tu@email.com">
+        </div>
+        <button class="btn btn-primary w-100">Enviar código por correo</button>
+    </form>
+
+    <!-- PASO 2: Ingresar código y nueva contraseña -->
+    {% else %}
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="step" value="2">
+        <div class="alert alert-info">Se envio un codigo a tu correo. Valido por 15 minutos.</div>
+        
+        <div class="mb-3">
+            <label class="form-label text-dark fw-semibold">Codigo de recuperacion (6 digitos)</label>
+            <input type="text" name="codigo" class="form-control" required placeholder="123456" maxlength="6">
+        </div>
+        <div class="mb-3">
+            <label class="form-label text-dark fw-semibold">Contrasena nueva</label>
+            <input type="password" name="nueva" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label text-dark fw-semibold">Confirmar contrasena</label>
+            <input type="password" name="confirmar" class="form-control" required>
+        </div>
+        <button class="btn btn-primary w-100">Actualizar contraseña</button>
+    </form>
+    {% endif %}
+
+    <div class="text-center mt-4">
+        <a href="/login" class="btn btn-secondary w-100">Regresar al inicio</a>
+    </div>
+    </div>
+</div>
+
+{% endblock %}
