@@ -1,0 +1,48 @@
+name: Backup PostgreSQL (Daily)
+
+on:
+  schedule:
+    # Diario 03:00 Colombia aprox (08:00 UTC)
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "Falta configurar el secret DATABASE_URL en GitHub."
+            exit 1
+          fi
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create backup dump
+        run: |
+          mkdir -p backups
+          TS=$(date -u +"%Y%m%d_%H%M%S")
+          FILE="backups/aquamax_backup_${TS}.sql"
+          pg_dump "$DATABASE_URL" --no-owner --no-acl --clean --if-exists > "$FILE"
+          gzip "$FILE"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aquamax-db-backup-${{ github.run_id }}
+          path: backups/*.sql.gz
+          if-no-files-found: error
+          retention-days: 30
