@@ -42,6 +42,43 @@ body {
     transition: 0.3s;
 }
 
+.sidebar.collapsed {
+    width: 70px;
+    padding: 20px 10px;
+}
+
+.sidebar.collapsed h3,
+.sidebar.collapsed a span,
+.sidebar.collapsed .session-box {
+    display: none;
+}
+
+.sidebar.collapsed a {
+    text-align: center;
+    padding: 12px 5px;
+    font-size: 20px;
+}
+
+.sidebar-toggle {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: #cbd5e1;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 6px;
+    transition: 0.2s;
+    width: auto;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(148, 163, 184, 0.2);
+    color: #38bdf8;
+}
+
 .sidebar h3 {
     font-size: 20px;
     margin-bottom: 20px;
@@ -262,27 +299,31 @@ body.loading {
     {% if session.get("user") %}
     <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
+            <button class="sidebar-toggle" onclick="toggleSidebar()" title="Ocultar menú">✕</button>
         <h3>💧 AQUAMAX</h3>
 
         <a href="/dashboard">📊 Dashboard</a>
         <a href="/inventario">📦 Inventario</a>
         <a href="/reporte">📄 Reporte</a>
 
-        {% if session.get("rol") in ["admin", "superadmin"] %}
-        <a href="/productos">📋 Productos</a>
-        <a href="/admin/usuarios">👤 Usuarios</a>
-        <a href="/admin/accesos">🕒 Ingresos</a>
-        <a href="/admin/ubicaciones">📍 Ubicaciones</a>
-        <a href="/admin/ajustes-stock">⚙️ Ajustes stock</a>
-        {% endif %}
+    <a href="/dashboard" title="Dashboard"><span>📊 Dashboard</span></a>
+    <a href="/inventario" title="Inventario"><span>📦 Inventario</span></a>
+    <a href="/reporte" title="Reporte"><span>📄 Reporte</span></a>
 
-        {% if session.get("rol") == "superadmin" %}
-        <a href="/admin/sistema">🛡️ Sistema</a>
-        {% endif %}
+    {% if session.get("rol") in ["admin", "superadmin"] %}
+    <a href="/productos" title="Productos"><span>📋 Productos</span></a>
+    <a href="/admin/usuarios" title="Usuarios"><span>👤 Usuarios</span></a>
+    <a href="/admin/accesos" title="Ingresos"><span>🕒 Ingresos</span></a>
+    <a href="/admin/ubicaciones" title="Ubicaciones"><span>📍 Ubicaciones</span></a>
+    <a href="/admin/ajustes-stock" title="Ajustes stock"><span>⚙️ Ajustes stock</span></a>
+    {% endif %}
 
-        <a href="/cambiar_contrasena">🔑 Cambiar clave</a>
-        <a href="/logout">🚪 Salir</a>
+    {% if session.get("rol") == "superadmin" %}
+    <a href="/admin/sistema" title="Sistema"><span>🛡️ Sistema</span></a>
+    {% endif %}
 
+    <a href="/cambiar_contrasena" title="Cambiar clave"><span>🔑 Cambiar clave</span></a>
+    <a href="/logout" title="Salir"><span>🚪 Salir</span></a>
         <div class="session-box" id="sessionBox"
              data-login-ts="{{ session_login_ts or '' }}"
              data-last-activity-ts="{{ session_last_activity_ts or '' }}"
@@ -332,6 +373,26 @@ function toggleMenu() {
     const sidebar = document.getElementById("sidebar");
     if (sidebar) {
         sidebar.classList.toggle("active");
+
+    function toggleSidebar() {
+        const sidebar = document.getElementById("sidebar");
+        if (sidebar) {
+            sidebar.classList.toggle("collapsed");
+            const isCollapsed = sidebar.classList.contains("collapsed");
+            localStorage.setItem("sidebarCollapsed", isCollapsed);
+        }
+    }
+
+    // Restaurar estado del sidebar al cargar
+    document.addEventListener("DOMContentLoaded", function () {
+        const sidebar = document.getElementById("sidebar");
+        if (sidebar) {
+            const isCollapsed = localStorage.getItem("sidebarCollapsed") === "true";
+            if (isCollapsed) {
+                sidebar.classList.add("collapsed");
+            }
+        }
+    });
     }
 }
 
