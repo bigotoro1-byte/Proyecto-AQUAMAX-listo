@@ -4,6 +4,11 @@
 <div class="container mt-5" style="max-width: 560px;">
     <div class="card p-4" style="background: rgba(255, 255, 255, 0.95); border-radius: 14px;">
     <h2 class="mb-3 text-dark">Cambiar contrasena</h2>
+    {% if forzado %}
+    <div class="alert alert-warning">
+        ⚠️ <strong>Debes cambiar tu contraseña</strong> antes de continuar. Tu contraseña actual es insegura.
+    </div>
+    {% endif %}
     {% if error %}
     <div class="alert alert-danger">{{ error }}</div>
     {% endif %}

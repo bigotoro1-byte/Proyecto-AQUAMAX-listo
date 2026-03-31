@@ -62,6 +62,14 @@ def login():
             FAILED_LOGINS.pop(key, None)
             session["user"] = user
             session["rol"] = usuario[2]
+            # Detectar contraseña débil/default y forzar cambio
+            passwords_debiles = ["1234", "admin", "password", "aquamax", "123456", "1234abcd"]
+            es_debil = any(
+                check_password_hash(usuario[1], pw)
+                for pw in passwords_debiles
+            )
+            if es_debil:
+                session["debe_cambiar_password"] = True
             return redirect("/dashboard")
 
         # Incrementar intentos fallidos
@@ -132,9 +140,11 @@ def cambiar_contrasena():
             return render_template('cambiar_contrasena.html', error='Contraseña actual incorrecta')
 
         actualizar_contrasena(session['user'], generate_password_hash(nueva))
+        session.pop('debe_cambiar_password', None)
         return render_template('cambiar_contrasena.html', success='Contraseña actualizada correctamente')
 
-    return render_template('cambiar_contrasena.html')
+    forzado = session.get('debe_cambiar_password', False)
+    return render_template('cambiar_contrasena.html', forzado=forzado)
 
 
 @auth_bp.route('/recuperar_contrasena', methods=['GET', 'POST'])

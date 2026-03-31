@@ -6,6 +6,8 @@ def login_required(f):
     def decorated(*args, **kwargs):
         if "user" not in session:
             return redirect("/login")
+        if session.get("debe_cambiar_password"):
+            return redirect("/cambiar_contrasena")
         return f(*args, **kwargs)
     return decorated
 
