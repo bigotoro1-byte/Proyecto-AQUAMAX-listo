@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, session, flash, send_file
-from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto, get_ubicaciones, add_ubicacion, delete_ubicacion, get_accesos_login, registrar_evento_sistema, get_panel_salud, registrar_accion_admin, limpiar_datos_expirados, get_auditoria, get_alertas_condiciones, get_usuarios_admin_email, cerrar_acceso_login, cerrar_accesos_activos_usuario
+from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto, get_ubicaciones, add_ubicacion, delete_ubicacion, get_accesos_login, registrar_evento_sistema, get_panel_salud, registrar_accion_admin, limpiar_datos_expirados, get_auditoria, get_alertas_condiciones, get_usuarios_admin_email, cerrar_acceso_login, cerrar_accesos_activos_usuario, revocar_acceso_login, revocar_sesiones_usuario
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 import os
@@ -541,6 +541,7 @@ def cerrar_acceso_admin(acceso_id):
 
     try:
         cerrar_acceso_login(acceso_id)
+        revocar_acceso_login(acceso_id)
         registrar_accion_admin(
             accion='cerrar_acceso_activo',
             username=session.get('user', 'desconocido'),
@@ -575,6 +576,7 @@ def cerrar_accesos_usuario_admin(user):
 
     try:
         cerrar_accesos_activos_usuario(user)
+        revocar_sesiones_usuario(user)
         registrar_accion_admin(
             accion='cerrar_accesos_usuario',
             username=session.get('user', 'desconocido'),

@@ -1,7 +1,7 @@
 from flask import Flask, session, redirect, flash
 from flask_wtf.csrf import CSRFProtect
 from flask_mail import Mail
-from database.db import crear_tablas, actualizar_tabla, insert_usuario, get_usuario, cerrar_acceso_login
+from database.db import crear_tablas, actualizar_tabla, insert_usuario, get_usuario, cerrar_acceso_login, get_revocacion_usuario, acceso_esta_revocado
 from werkzeug.security import generate_password_hash
 import os
 import time
@@ -60,6 +60,34 @@ mail = Mail(app)
 def controlar_sesion_por_inactividad():
     if not session.get('user'):
         return None
+
+    # Cierre forzado en tiempo real: por acceso específico o por usuario.
+    try:
+        acceso_id = session.get('acceso_login_id')
+        if acceso_id and acceso_esta_revocado(acceso_id):
+            try:
+                cerrar_acceso_login(acceso_id)
+            except Exception:
+                pass
+            session.clear()
+            flash('Tu sesion fue cerrada por un administrador.', 'error')
+            return redirect('/login')
+
+        usuario = session.get('user')
+        revoked_at = get_revocacion_usuario(usuario)
+        login_at_ts = int(session.get('login_at_ts') or 0)
+        if revoked_at and ((not login_at_ts) or revoked_at.timestamp() >= login_at_ts):
+            if acceso_id:
+                try:
+                    cerrar_acceso_login(acceso_id)
+                except Exception:
+                    pass
+            session.clear()
+            flash('Tu sesion fue cerrada por un administrador.', 'error')
+            return redirect('/login')
+    except Exception:
+        # Si falla la verificacion de revocacion no debe romper la app.
+        pass
 
     now_ts = int(time.time())
     last_activity = session.get('last_activity_ts')

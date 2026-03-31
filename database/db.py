@@ -198,6 +198,24 @@ def crear_tablas():
         """
     )
 
+    # Revocacion de sesiones (forzar logout en tiempo real)
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS session_revocations (
+            username TEXT PRIMARY KEY,
+            revoke_after TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS acceso_revocations (
+            acceso_id INTEGER PRIMARY KEY,
+            revoked_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+
     # Indices para rendimiento en consultas frecuentes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventario_producto_piscina ON inventario(producto, piscina)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventario_fecha ON inventario(fecha)")
@@ -210,6 +228,7 @@ def crear_tablas():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_password_recovery_state_expires_at ON password_recovery_state(expires_at)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_events_evento_created ON system_events(evento, created_at DESC)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_email_envios_log_created_at ON email_envios_log(created_at DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_acceso_revocations_revoked_at ON acceso_revocations(revoked_at DESC)")
 
     # Valores por defecto para ajustes de stock
     defaults = {
@@ -301,10 +320,27 @@ def actualizar_tabla():
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS session_revocations (
+                username TEXT PRIMARY KEY,
+                revoke_after TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS acceso_revocations (
+                acceso_id INTEGER PRIMARY KEY,
+                revoked_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """
+        )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_auth_login_state_blocked_until ON auth_login_state(blocked_until)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_password_recovery_state_expires_at ON password_recovery_state(expires_at)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_events_evento_created ON system_events(evento, created_at DESC)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_email_envios_log_created_at ON email_envios_log(created_at DESC)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acceso_revocations_revoked_at ON acceso_revocations(revoked_at DESC)")
         
         # 🔐 Migracion: Auditoría detallada en system_events
         cursor.execute("ALTER TABLE system_events ADD COLUMN IF NOT EXISTS ip_address TEXT")
@@ -946,6 +982,80 @@ def cerrar_accesos_activos_usuario(username):
     except Exception as e:
         conn.rollback()
         raise e
+    finally:
+        conn.close()
+
+
+def revocar_sesiones_usuario(username):
+    if not username:
+        return
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO session_revocations (username, revoke_after)
+            VALUES (%s, NOW())
+            ON CONFLICT (username)
+            DO UPDATE SET revoke_after = EXCLUDED.revoke_after
+            """,
+            (username,)
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def get_revocacion_usuario(username):
+    if not username:
+        return None
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT revoke_after FROM session_revocations WHERE LOWER(username) = LOWER(%s)",
+            (username,)
+        )
+        row = cursor.fetchone()
+        return row[0] if row else None
+    finally:
+        conn.close()
+
+
+def revocar_acceso_login(acceso_id):
+    if not acceso_id:
+        return
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO acceso_revocations (acceso_id, revoked_at)
+            VALUES (%s, NOW())
+            ON CONFLICT (acceso_id)
+            DO UPDATE SET revoked_at = EXCLUDED.revoked_at
+            """,
+            (acceso_id,)
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def acceso_esta_revocado(acceso_id):
+    if not acceso_id:
+        return False
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT 1 FROM acceso_revocations WHERE acceso_id = %s", (acceso_id,))
+        return cursor.fetchone() is not None
     finally:
         conn.close()
 
