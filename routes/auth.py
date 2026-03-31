@@ -37,11 +37,46 @@ def _send_recovery_email(user, email, codigo):
 
     resend_api_key = (os.getenv('RESEND_API_KEY') or '').strip()
     resend_from = (os.getenv('RESEND_FROM') or '').strip() or 'onboarding@resend.dev'
-    smtp_from = os.getenv('MAIL_FROM', 'aquamax@tuempresa.com')
 
+    # 1) Intento principal: SMTP clásico (como antes del cambio).
+    mail_server = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+    mail_port = int(os.getenv('MAIL_PORT', 587))
+    mail_user = os.getenv('MAIL_USERNAME')
+    mail_pass = os.getenv('MAIL_PASSWORD')
+
+    # Para Gmail, usar MAIL_USERNAME como remitente evita rechazo por sender distinto.
+    smtp_from_env = (os.getenv('SMTP_FROM') or os.getenv('MAIL_FROM') or '').strip()
+    if 'gmail' in (mail_server or '').lower() and mail_user:
+        smtp_from = mail_user
+    else:
+        smtp_from = smtp_from_env or mail_user or 'no-reply@localhost'
+
+    smtp_error = ''
+
+    if mail_user and mail_pass:
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = smtp_from
+            msg['To'] = email
+            msg_text = MIMEText(body, 'plain', 'utf-8')
+            msg.attach(msg_text)
+
+            with smtplib.SMTP(mail_server, mail_port, timeout=8) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(mail_user, mail_pass)
+                server.send_message(msg)
+            return True, ''
+        except Exception as e:
+            current_app.logger.error(f'Error SMTP: {str(e)}')
+            smtp_error = f'SMTP: {str(e)}'
+    else:
+        smtp_error = 'SMTP sin credenciales'
+
+    # 2) Fallback: Resend API (HTTPS/443).
     resend_error = ''
-
-    # 1) Intento principal: Resend API (HTTPS/443).
     if resend_api_key:
         try:
             response = requests.post(
@@ -76,36 +111,9 @@ def _send_recovery_email(user, email, codigo):
             current_app.logger.error(f'Error Resend: {str(e)}')
             resend_error = f'Resend red: {str(e)}'
 
-    # 2) Fallback: SMTP clásico.
-    mail_server = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
-    mail_port = int(os.getenv('MAIL_PORT', 587))
-    mail_user = os.getenv('MAIL_USERNAME')
-    mail_pass = os.getenv('MAIL_PASSWORD')
-
-    if not mail_user or not mail_pass:
-        return False, resend_error or 'SMTP sin credenciales'
-
-    try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = smtp_from
-        msg['To'] = email
-        msg_text = MIMEText(body, 'plain', 'utf-8')
-        msg.attach(msg_text)
-
-        with smtplib.SMTP(mail_server, mail_port, timeout=8) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(mail_user, mail_pass)
-            server.send_message(msg)
-        return True, ''
-    except Exception as e:
-        current_app.logger.error(f'Error SMTP fallback: {str(e)}')
-        smtp_error = f'SMTP: {str(e)}'
-        if resend_error:
-            return False, f'{resend_error} | {smtp_error}'
-        return False, smtp_error
+    if smtp_error and resend_error:
+        return False, f'{smtp_error} | {resend_error}'
+    return False, smtp_error or resend_error or 'No se pudo enviar correo'
 
 
 def _password_matches(expected_value, provided_password):
