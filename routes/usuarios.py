@@ -237,11 +237,6 @@ def eliminar_ubicacion(nombre):
     if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
         return render_template("acceso_denegado.html"), 403
 
-    protegidas = {"piscina", "pasillos", "oficinas", "otros"}
-    if (nombre or "").strip().lower() in protegidas:
-        flash("No puedes eliminar una ubicacion base del sistema", "error")
-        return redirect("/admin/ubicaciones")
-
     try:
         delete_ubicacion(nombre)
         flash("Ubicacion eliminada", "success")

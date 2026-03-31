@@ -108,13 +108,6 @@ def crear_tablas():
             (clave, valor)
         )
 
-    ubicaciones_default = ["Piscina", "Pasillos", "Oficinas", "Otros"]
-    for nombre in ubicaciones_default:
-        cursor.execute(
-            "INSERT INTO ubicaciones (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING",
-            (nombre,)
-        )
-
     conn.commit()
     conn.close()
 

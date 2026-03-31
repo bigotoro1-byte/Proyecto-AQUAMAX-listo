@@ -35,14 +35,10 @@
                         <tr>
                             <td>{{ u }}</td>
                             <td class="text-end">
-                                {% if u|lower not in ['piscina', 'pasillos', 'oficinas', 'otros'] %}
                                 <form method="POST" action="/admin/ubicaciones/eliminar/{{ u|urlencode }}" style="display:inline;">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
                                 </form>
-                                {% else %}
-                                <span class="badge bg-secondary">Base</span>
-                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
