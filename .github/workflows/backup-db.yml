@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Validate secret
         run: |
@@ -26,17 +26,16 @@ jobs:
             exit 1
           fi
 
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
-      - name: Create backup dump
+      - name: Create backup dump (PostgreSQL 18 client)
         run: |
           mkdir -p backups
           TS=$(date -u +"%Y%m%d_%H%M%S")
           FILE="backups/aquamax_backup_${TS}.sql"
-          pg_dump "$DATABASE_URL" --no-owner --no-acl --clean --if-exists > "$FILE"
+          docker run --rm \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -v "$PWD/backups:/backups" \
+            postgres:18 \
+            sh -c 'pg_dump "$DATABASE_URL" --no-owner --no-acl --clean --if-exists > "/backups/aquamax_backup_'"${TS}"'.sql"'
           gzip "$FILE"
 
       - name: Upload artifact
