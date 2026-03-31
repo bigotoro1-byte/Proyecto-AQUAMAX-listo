@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, session, redirect, flash
-from database.db import conectar, get_productos, insert_inventario, get_inventario, get_stock_actual, get_stock_general_por_producto, get_configuracion_stock, get_configuracion_stock_producto_map_por_nombre, descontar_stock, insert_movimiento, get_movimientos_salida
+from database.db import conectar, get_productos, insert_inventario, get_inventario, get_stock_actual, get_stock_general_por_producto, get_configuracion_stock, get_configuracion_stock_producto_map_por_nombre, descontar_stock, insert_movimiento, get_movimientos_salida, get_ubicaciones
 from datetime import datetime
 from routes.utils import login_required
 from flask_wtf import FlaskForm
@@ -15,7 +15,7 @@ class EntradaForm(FlaskForm):
 class SalidaForm(FlaskForm):
     producto = SelectField('Producto', validators=[DataRequired()])
     cantidad = FloatField('Cantidad', validators=[DataRequired(), NumberRange(min=0.01)])
-    ubicacion = SelectField('Ubicación', choices=[('Piscina', 'Piscina'), ('Pasillos', 'Pasillos'), ('Oficinas', 'Oficinas'), ('Otros', 'Otros')], validators=[DataRequired()])
+    ubicacion = SelectField('Ubicación', choices=[], validators=[DataRequired()])
 
 @inventario_bp.route('/inventario', methods=['GET','POST'])
 @login_required
@@ -26,8 +26,10 @@ def inventario():
     productos_db = get_productos()
     cfg = get_configuracion_stock()
     choices = [(p[0], p[1]) for p in productos_db]
+    ubicaciones = get_ubicaciones()
     entrada_form.producto.choices = choices
     salida_form.producto.choices = choices
+    salida_form.ubicacion.choices = [(u, u) for u in ubicaciones]
 
     if entrada_form.validate_on_submit():
         producto_id = entrada_form.producto.data
@@ -82,7 +84,9 @@ def salida():
 
     productos_db = get_productos()
     cfg = get_configuracion_stock()
+    ubicaciones = get_ubicaciones()
     salida_form.producto.choices = [(p[0], p[1]) for p in productos_db]
+    salida_form.ubicacion.choices = [(u, u) for u in ubicaciones]
 
     if salida_form.validate_on_submit():
         producto_id = salida_form.producto.data

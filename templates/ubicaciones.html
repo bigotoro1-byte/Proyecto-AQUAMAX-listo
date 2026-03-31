@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container mt-4" style="max-width: 900px;">
+    <h2 class="mb-4">📍 Gestión de Ubicaciones</h2>
+
+    <div class="card p-3 mb-4 shadow">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row g-2">
+                <div class="col-md-9 col-12">
+                    <input type="text" name="nombre" class="form-control" placeholder="Ejemplo: Bodega Norte" required>
+                </div>
+                <div class="col-md-3 col-12">
+                    <button class="btn btn-primary w-100" type="submit">Agregar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="card p-3 shadow">
+        <h5 class="mb-3">Ubicaciones registradas</h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nombre</th>
+                        <th class="text-end">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if ubicaciones %}
+                        {% for u in ubicaciones %}
+                        <tr>
+                            <td>{{ u }}</td>
+                            <td class="text-end">
+                                {% if u|lower not in ['piscina', 'pasillos', 'oficinas', 'otros'] %}
+                                <form method="POST" action="/admin/ubicaciones/eliminar/{{ u|urlencode }}" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-danger btn-sm" type="submit">Eliminar</button>
+                                </form>
+                                {% else %}
+                                <span class="badge bg-secondary">Base</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="2" class="text-center text-muted">No hay ubicaciones registradas</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

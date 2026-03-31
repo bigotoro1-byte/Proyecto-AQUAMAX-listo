@@ -80,6 +80,13 @@ def crear_tablas():
     )
     """)
 
+    # Ubicaciones configurables para salida
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ubicaciones (
+        nombre TEXT PRIMARY KEY
+    )
+    """)
+
     # Indices para rendimiento en consultas frecuentes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventario_producto_piscina ON inventario(producto, piscina)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventario_fecha ON inventario(fecha)")
@@ -99,6 +106,13 @@ def crear_tablas():
         cursor.execute(
             "INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT (clave) DO NOTHING",
             (clave, valor)
+        )
+
+    ubicaciones_default = ["Piscina", "Pasillos", "Oficinas", "Otros"]
+    for nombre in ubicaciones_default:
+        cursor.execute(
+            "INSERT INTO ubicaciones (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING",
+            (nombre,)
         )
 
     conn.commit()
@@ -369,6 +383,44 @@ def get_movimientos_salida(limit=10, usuario=None):
     data = cursor.fetchall()
     conn.close()
     return data
+
+
+def get_ubicaciones():
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("SELECT nombre FROM ubicaciones ORDER BY nombre")
+    data = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return data
+
+
+def add_ubicacion(nombre):
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO ubicaciones (nombre) VALUES (%s)",
+            (nombre,)
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def delete_ubicacion(nombre):
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM ubicaciones WHERE nombre = %s", (nombre,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 def descontar_stock(producto, cantidad, usuario=None):
     conn = conectar()

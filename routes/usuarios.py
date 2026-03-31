@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, session, flash
-from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto
+from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto, get_ubicaciones, add_ubicacion, delete_ubicacion
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 import os
@@ -202,3 +202,50 @@ def ajustes_stock():
     cfg = get_configuracion_stock()
     productos_en_stock = get_configuracion_stock_productos_en_stock()
     return render_template("ajustes_stock.html", cfg=cfg, productos_en_stock=productos_en_stock)
+
+
+@usuarios_bp.route("/ubicaciones", methods=["GET", "POST"])
+def ubicaciones_admin():
+    if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
+        return render_template("acceso_denegado.html"), 403
+
+    if request.method == "POST":
+        nombre = (request.form.get("nombre") or "").strip()
+
+        if not nombre:
+            flash("Ingresa un nombre de ubicacion", "error")
+            return redirect("/admin/ubicaciones")
+
+        try:
+            existentes = [u.lower() for u in get_ubicaciones()]
+            if nombre.lower() in existentes:
+                flash("La ubicacion ya existe", "error")
+                return redirect("/admin/ubicaciones")
+
+            add_ubicacion(nombre)
+            flash("Ubicacion agregada correctamente", "success")
+        except Exception as e:
+            flash(f"No se pudo agregar la ubicacion: {str(e)}", "error")
+
+        return redirect("/admin/ubicaciones")
+
+    return render_template("ubicaciones.html", ubicaciones=get_ubicaciones())
+
+
+@usuarios_bp.route("/ubicaciones/eliminar/<path:nombre>", methods=["POST"])
+def eliminar_ubicacion(nombre):
+    if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
+        return render_template("acceso_denegado.html"), 403
+
+    protegidas = {"piscina", "pasillos", "oficinas", "otros"}
+    if (nombre or "").strip().lower() in protegidas:
+        flash("No puedes eliminar una ubicacion base del sistema", "error")
+        return redirect("/admin/ubicaciones")
+
+    try:
+        delete_ubicacion(nombre)
+        flash("Ubicacion eliminada", "success")
+    except Exception as e:
+        flash(f"No se pudo eliminar la ubicacion: {str(e)}", "error")
+
+    return redirect("/admin/ubicaciones")
