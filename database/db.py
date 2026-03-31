@@ -955,6 +955,7 @@ def get_accesos_login(limit=100, username=None, fecha_desde=None, fecha_hasta=No
     cursor = conn.cursor()
     query = """
         SELECT
+            id,
             username,
             rol,
             ip,

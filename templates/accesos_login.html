@@ -38,36 +38,53 @@
                         <th>Duracion</th>
                         <th>Estado</th>
                         <th>IP</th>
+                        <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% if accesos %}
                         {% for a in accesos %}
                         <tr>
-                            <td class="fw-semibold">{{ a[0] }}</td>
-                            <td>{{ a[1] or '-' }}</td>
-                            <td>{{ a[4] }}</td>
-                            <td>{{ a[5] or '-' }}</td>
+                            <td class="fw-semibold">{{ a[1] }}</td>
+                            <td>{{ a[2] or '-' }}</td>
+                            <td>{{ a[5] }}</td>
+                            <td>{{ a[6] or '-' }}</td>
                             <td>
-                                {% set total = a[6] or 0 %}
+                                {% set total = a[7] or 0 %}
                                 {% set h = (total // 3600)|int %}
                                 {% set m = ((total % 3600) // 60)|int %}
                                 {% set s = (total % 60)|int %}
                                 {{ "%02d:%02d:%02d"|format(h, m, s) }}
                             </td>
                             <td>
-                                {% if a[7] == 'Activa' %}
+                                {% if a[8] == 'Activa' %}
                                 <span class="badge bg-success">Activa</span>
                                 {% else %}
                                 <span class="badge bg-secondary">Cerrada</span>
                                 {% endif %}
                             </td>
-                            <td>{{ a[2] or '-' }}</td>
+                            <td>{{ a[3] or '-' }}</td>
+                            <td>
+                                {% if a[8] == 'Activa' %}
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <form method="post" action="/admin/accesos/cerrar/{{ a[0] }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Cerrar esta sesion activa?');">Cerrar sesion</button>
+                                    </form>
+                                    <form method="post" action="/admin/accesos/cerrar-usuario/{{ a[1] }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Cerrar TODAS las sesiones activas de {{ a[1] }}?');">Cerrar usuario</button>
+                                    </form>
+                                </div>
+                                {% else %}
+                                <span class="text-muted small">Sin acciones</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted">No hay ingresos registrados.</td>
+                            <td colspan="8" class="text-center text-muted">No hay ingresos registrados.</td>
                         </tr>
                     {% endif %}
                 </tbody>

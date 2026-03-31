@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, session, flash, send_file
-from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto, get_ubicaciones, add_ubicacion, delete_ubicacion, get_accesos_login, registrar_evento_sistema, get_panel_salud, registrar_accion_admin, limpiar_datos_expirados, get_auditoria, get_alertas_condiciones, get_usuarios_admin_email
+from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto, get_ubicaciones, add_ubicacion, delete_ubicacion, get_accesos_login, registrar_evento_sistema, get_panel_salud, registrar_accion_admin, limpiar_datos_expirados, get_auditoria, get_alertas_condiciones, get_usuarios_admin_email, cerrar_acceso_login, cerrar_accesos_activos_usuario
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 import os
@@ -532,6 +532,70 @@ def accesos_login_admin():
             "fecha_hasta": fecha_hasta,
         },
     )
+
+
+@usuarios_bp.route("/accesos/cerrar/<int:acceso_id>", methods=["POST"])
+def cerrar_acceso_admin(acceso_id):
+    if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
+        return render_template("acceso_denegado.html"), 403
+
+    try:
+        cerrar_acceso_login(acceso_id)
+        registrar_accion_admin(
+            accion='cerrar_acceso_activo',
+            username=session.get('user', 'desconocido'),
+            estado='ok',
+            detalle=f'Acceso ID {acceso_id} cerrado manualmente',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+        flash("Sesion activa cerrada correctamente.", "success")
+    except Exception as e:
+        registrar_accion_admin(
+            accion='cerrar_acceso_activo',
+            username=session.get('user', 'desconocido'),
+            estado='error',
+            detalle=str(e)[:220],
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+        flash(f"No se pudo cerrar la sesion: {str(e)}", "error")
+
+    return redirect("/admin/accesos")
+
+
+@usuarios_bp.route("/accesos/cerrar-usuario/<user>", methods=["POST"])
+def cerrar_accesos_usuario_admin(user):
+    if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
+        return render_template("acceso_denegado.html"), 403
+
+    if not user:
+        flash("Usuario invalido", "error")
+        return redirect("/admin/accesos")
+
+    try:
+        cerrar_accesos_activos_usuario(user)
+        registrar_accion_admin(
+            accion='cerrar_accesos_usuario',
+            username=session.get('user', 'desconocido'),
+            estado='ok',
+            detalle=f'Accesos activos cerrados para usuario {user}',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+        flash(f"Sesiones activas de {user} cerradas.", "success")
+    except Exception as e:
+        registrar_accion_admin(
+            accion='cerrar_accesos_usuario',
+            username=session.get('user', 'desconocido'),
+            estado='error',
+            detalle=str(e)[:220],
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+        flash(f"No se pudieron cerrar sesiones de {user}: {str(e)}", "error")
+
+    return redirect("/admin/accesos")
 
 
 # 🔍 AUDITORÍA: Ver registro de acciones administrativas
