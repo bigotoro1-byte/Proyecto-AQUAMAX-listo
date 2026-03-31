@@ -46,7 +46,7 @@ def login():
         conn = conectar()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT * FROM usuarios WHERE username=?", (user,))
+        cursor.execute("SELECT * FROM usuarios WHERE username=%s", (user,))
         usuario = cursor.fetchone()
 
         conn.close()
@@ -117,7 +117,7 @@ def cambiar_contrasena():
 
         conn = conectar()
         cursor = conn.cursor()
-        cursor.execute('SELECT password FROM usuarios WHERE username = ?', (session['user'],))
+        cursor.execute('SELECT password FROM usuarios WHERE username = %s', (session['user'],))
         usuario = cursor.fetchone()
         conn.close()
 
@@ -152,7 +152,7 @@ def recuperar_contrasena():
 
             conn = conectar()
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM usuarios WHERE username = ?', (user,))
+            cursor.execute('SELECT * FROM usuarios WHERE username = %s', (user,))
             usuario = cursor.fetchone()
             conn.close()
 

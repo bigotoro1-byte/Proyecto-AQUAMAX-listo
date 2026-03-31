@@ -72,7 +72,7 @@ def eliminar_usuario(user):
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM usuarios WHERE username=?", (user,))
+    cursor.execute("DELETE FROM usuarios WHERE username=%s", (user,))
     conn.commit()
     conn.close()
 

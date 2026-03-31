@@ -1,33 +1,17 @@
-import sqlite3
 import os
+import psycopg2
+import psycopg2.extras
 from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_db_path():
-    raw_url = os.getenv('DATABASE_URL')
-
-    # Si hay ruta explícita (ej. Render con disco), usarla obligatoriamente
-    # para no escribir en almacenamiento efimero y perder datos en deploy.
-    if raw_url:
-        db_path = raw_url.replace('sqlite:///', '')
-        db_dir = os.path.dirname(db_path)
-        if db_dir:
-            try:
-                os.makedirs(db_dir, exist_ok=True)
-            except OSError as e:
-                raise RuntimeError(
-                    f"No se pudo preparar el directorio de la base de datos configurada: {db_dir}"
-                ) from e
-        return db_path
-
-    # Fallback local solo para desarrollo.
-    fallback_path = os.path.join('data', 'database', 'inventario.db')
-    os.makedirs(os.path.dirname(fallback_path), exist_ok=True)
-    return fallback_path
-
 def conectar():
-    return sqlite3.connect(get_db_path())
+    database_url = os.getenv('DATABASE_URL')
+    if not database_url:
+        raise RuntimeError('DATABASE_URL no está configurado.')
+    conn = psycopg2.connect(database_url)
+    conn.autocommit = False
+    return conn
 
 def crear_tablas():
     conn = conectar()
@@ -56,7 +40,7 @@ def crear_tablas():
     # Inventario
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS inventario (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         producto TEXT NOT NULL,
         cantidad REAL NOT NULL,
         piscina TEXT NOT NULL,
@@ -68,7 +52,7 @@ def crear_tablas():
     # Movimientos
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS movimientos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         producto TEXT NOT NULL,
         tipo TEXT NOT NULL,
         cantidad REAL NOT NULL,
@@ -113,7 +97,7 @@ def crear_tablas():
     }
     for clave, valor in defaults.items():
         cursor.execute(
-            "INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)",
+            "INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT (clave) DO NOTHING",
             (clave, valor)
         )
 
@@ -130,7 +114,7 @@ def insert_usuario(username, password, rol):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT OR REPLACE INTO usuarios (username, password, rol) VALUES (?, ?, ?)",
+            "INSERT INTO usuarios (username, password, rol) VALUES (%s, %s, %s) ON CONFLICT (username) DO UPDATE SET password=EXCLUDED.password, rol=EXCLUDED.rol",
             (username, password, rol)
         )
         conn.commit()
@@ -143,7 +127,7 @@ def insert_usuario(username, password, rol):
 def get_usuario(username):
     conn = conectar()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM usuarios WHERE username = ?", (username,))
+    cursor.execute("SELECT * FROM usuarios WHERE username = %s", (username,))
     user = cursor.fetchone()
     conn.close()
     return user
@@ -151,7 +135,7 @@ def get_usuario(username):
 def actualizar_contrasena(username, new_password_hash):
     conn = conectar()
     cursor = conn.cursor()
-    cursor.execute("UPDATE usuarios SET password = ? WHERE username = ?", (new_password_hash, username))
+    cursor.execute("UPDATE usuarios SET password = %s WHERE username = %s", (new_password_hash, username))
     conn.commit()
     conn.close()
 
@@ -160,7 +144,7 @@ def insert_producto(id, nombre, tipo, fecha, usuario):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO productos (id, nombre, tipo, fecha, usuario) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO productos (id, nombre, tipo, fecha, usuario) VALUES (%s, %s, %s, %s, %s)",
             (id, nombre, tipo, fecha, usuario)
         )
         conn.commit()
@@ -173,7 +157,7 @@ def insert_producto(id, nombre, tipo, fecha, usuario):
 def get_productos():
     conn = conectar()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM productos")
+    cursor.execute("SELECT * FROM productos ORDER BY nombre")
     productos = cursor.fetchall()
     conn.close()
     return productos
@@ -183,7 +167,7 @@ def insert_inventario(producto, cantidad, piscina, fecha, usuario):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO inventario (producto, cantidad, piscina, fecha, usuario) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO inventario (producto, cantidad, piscina, fecha, usuario) VALUES (%s, %s, %s, %s, %s)",
             (producto, cantidad, piscina, fecha, usuario)
         )
         conn.commit()
@@ -197,7 +181,7 @@ def get_inventario(user=None):
     conn = conectar()
     cursor = conn.cursor()
     if user:
-        cursor.execute("SELECT * FROM inventario WHERE usuario = ?", (user,))
+        cursor.execute("SELECT * FROM inventario WHERE usuario = %s", (user,))
     else:
         cursor.execute("SELECT * FROM inventario")
     inventario = cursor.fetchall()
@@ -212,7 +196,7 @@ def get_stock_actual():
         FROM inventario i
         LEFT JOIN productos p ON p.id = i.producto
         WHERE i.piscina = 'GENERAL'
-        GROUP BY producto_nombre, i.piscina, i.usuario
+        GROUP BY COALESCE(p.nombre, i.producto), i.piscina, i.usuario
     """)
     stock = cursor.fetchall()
     conn.close()
@@ -224,7 +208,7 @@ def get_stock_general_por_producto():
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT producto, IFNULL(SUM(cantidad), 0)
+        SELECT producto, COALESCE(SUM(cantidad), 0)
         FROM inventario
         WHERE piscina = 'GENERAL'
         GROUP BY producto
@@ -266,7 +250,7 @@ def set_configuracion_stock(config_dict):
     try:
         for clave, valor in config_dict.items():
             cursor.execute(
-                "INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)",
+                "INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT (clave) DO UPDATE SET valor=EXCLUDED.valor",
                 (clave, str(valor))
             )
         conn.commit()
@@ -283,8 +267,12 @@ def set_configuracion_stock_producto(producto_id, umbral_critico, umbral_medio, 
     try:
         cursor.execute(
             """
-            INSERT OR REPLACE INTO configuracion_producto (producto, umbral_critico, umbral_medio, umbral_alerta_dashboard)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO configuracion_producto (producto, umbral_critico, umbral_medio, umbral_alerta_dashboard)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (producto) DO UPDATE SET
+                umbral_critico=EXCLUDED.umbral_critico,
+                umbral_medio=EXCLUDED.umbral_medio,
+                umbral_alerta_dashboard=EXCLUDED.umbral_alerta_dashboard
             """,
             (producto_id, float(umbral_critico), float(umbral_medio), float(umbral_alerta_dashboard))
         )
@@ -305,15 +293,15 @@ def get_configuracion_stock_productos_en_stock():
         SELECT
             p.id,
             p.nombre,
-            IFNULL(SUM(i.cantidad), 0) AS stock_general,
-            IFNULL(cp.umbral_critico, ?) AS umbral_critico,
-            IFNULL(cp.umbral_medio, ?) AS umbral_medio,
-            IFNULL(cp.umbral_alerta_dashboard, ?) AS umbral_alerta_dashboard
+            COALESCE(SUM(i.cantidad), 0) AS stock_general,
+            COALESCE(cp.umbral_critico, %s) AS umbral_critico,
+            COALESCE(cp.umbral_medio, %s) AS umbral_medio,
+            COALESCE(cp.umbral_alerta_dashboard, %s) AS umbral_alerta_dashboard
         FROM productos p
         LEFT JOIN inventario i ON p.id = i.producto AND i.piscina = 'GENERAL'
         LEFT JOIN configuracion_producto cp ON cp.producto = p.id
         GROUP BY p.id, p.nombre, cp.umbral_critico, cp.umbral_medio, cp.umbral_alerta_dashboard
-        HAVING stock_general > 0
+        HAVING COALESCE(SUM(i.cantidad), 0) > 0
         ORDER BY p.nombre
         """,
         (cfg['umbral_critico'], cfg['umbral_medio'], cfg['umbral_alerta_dashboard'])
@@ -340,7 +328,7 @@ def insert_movimiento(producto, tipo, cantidad, ubicacion, fecha, usuario):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO movimientos (producto, tipo, cantidad, ubicacion, fecha, usuario) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO movimientos (producto, tipo, cantidad, ubicacion, fecha, usuario) VALUES (%s, %s, %s, %s, %s, %s)",
             (producto, tipo, cantidad, ubicacion, fecha, usuario)
         )
         conn.commit()
@@ -360,9 +348,9 @@ def get_movimientos_salida(limit=10, usuario=None):
             SELECT COALESCE(p.nombre, m.producto), m.tipo, m.cantidad, m.ubicacion, m.fecha, m.usuario
             FROM movimientos m
             LEFT JOIN productos p ON p.id = m.producto
-            WHERE m.tipo = 'SALIDA' AND m.usuario = ?
+            WHERE m.tipo = 'SALIDA' AND m.usuario = %s
             ORDER BY m.id DESC
-            LIMIT ?
+            LIMIT %s
             """,
             (usuario, limit),
         )
@@ -374,7 +362,7 @@ def get_movimientos_salida(limit=10, usuario=None):
             LEFT JOIN productos p ON p.id = m.producto
             WHERE m.tipo = 'SALIDA'
             ORDER BY m.id DESC
-            LIMIT ?
+            LIMIT %s
             """,
             (limit,),
         )
@@ -388,7 +376,7 @@ def descontar_stock(producto, cantidad, usuario=None):
     try:
         # Obtener entradas en GENERAL ordenadas por fecha (cualquier usuario)
         cursor.execute(
-            "SELECT id, cantidad FROM inventario WHERE producto = ? AND piscina = 'GENERAL' ORDER BY fecha",
+            "SELECT id, cantidad FROM inventario WHERE producto = %s AND piscina = 'GENERAL' ORDER BY fecha",
             (producto,)
         )
         entradas = cursor.fetchall()
@@ -400,12 +388,12 @@ def descontar_stock(producto, cantidad, usuario=None):
             if entrada_cantidad > cantidad_restante:
                 nueva_cantidad = entrada_cantidad - cantidad_restante
                 cursor.execute(
-                    "UPDATE inventario SET cantidad = ? WHERE id = ?",
+                    "UPDATE inventario SET cantidad = %s WHERE id = %s",
                     (nueva_cantidad, entrada_id)
                 )
                 cantidad_restante = 0
             else:
-                cursor.execute("DELETE FROM inventario WHERE id = ?", (entrada_id,))
+                cursor.execute("DELETE FROM inventario WHERE id = %s", (entrada_id,))
                 cantidad_restante -= entrada_cantidad
 
         conn.commit()

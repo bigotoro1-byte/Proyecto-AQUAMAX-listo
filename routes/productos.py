@@ -9,7 +9,7 @@ productos_bp = Blueprint("productos", __name__)
 def generar_codigo_producto(cursor):
     while True:
         codigo = f"PRD-{uuid.uuid4().hex[:8].upper()}"
-        cursor.execute("SELECT 1 FROM productos WHERE id = ?", (codigo,))
+        cursor.execute("SELECT 1 FROM productos WHERE id = %s", (codigo,))
         if not cursor.fetchone():
             return codigo
 
