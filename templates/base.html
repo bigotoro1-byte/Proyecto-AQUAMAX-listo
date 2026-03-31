@@ -138,7 +138,7 @@ body {
 
 .content-panel {
     min-height: 100vh;
-    padding-top: 78px;
+    padding-top: 16px;
     background: rgba(248, 250, 252, 0.35);
     backdrop-filter: blur(1px);
 }
@@ -199,28 +199,27 @@ button {
     }
 
     .menu-toggle {
-            top: 14px;
+        margin-bottom: 12px;
     }
 }
 
-    .menu-toggle {
-        position: fixed;
-        top: 14px;
-        left: 14px;
-        width: auto;
-        padding: 8px 12px;
-        border-radius: 10px;
-        background: rgba(15, 23, 42, 0.92);
-        color: #f8fafc;
-        border: 1px solid rgba(148, 163, 184, 0.4);
-        z-index: 1250;
-        font-size: 18px;
-        line-height: 1;
-    }
+.menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+    padding: 8px 12px;
+    margin-bottom: 14px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.92);
+    color: #f8fafc;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    font-size: 18px;
+    line-height: 1;
+}
 
-    .menu-toggle:hover {
-        background: #1e293b;
-    }
+.menu-toggle:hover {
+    background: #1e293b;
+}
 
 /* =========================
    TABLA EMPRESARIAL COMPACTA
@@ -306,7 +305,7 @@ body.loading {
     }
 
     .content-panel {
-        padding-top: 88px;
+        padding-top: 12px;
     }
 }
 
