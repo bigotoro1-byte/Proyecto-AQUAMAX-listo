@@ -51,7 +51,14 @@ def login():
 
         conn.close()
 
-        if usuario and check_password_hash(usuario[1], password):
+        password_ok = False
+        if usuario:
+            try:
+                password_ok = check_password_hash(usuario[1], password)
+            except (ValueError, TypeError):
+                current_app.logger.error(f"Hash invalido para usuario: {user}")
+
+        if usuario and password_ok:
             FAILED_LOGINS.pop(key, None)
             session["user"] = user
             session["rol"] = usuario[2]
@@ -114,7 +121,14 @@ def cambiar_contrasena():
         usuario = cursor.fetchone()
         conn.close()
 
-        if not usuario or not check_password_hash(usuario[0], actual):
+        password_ok = False
+        if usuario:
+            try:
+                password_ok = check_password_hash(usuario[0], actual)
+            except (ValueError, TypeError):
+                current_app.logger.error(f"Hash invalido en cambio de clave para usuario: {session.get('user')}")
+
+        if not usuario or not password_ok:
             return render_template('cambiar_contrasena.html', error='Contraseña actual incorrecta')
 
         actualizar_contrasena(session['user'], generate_password_hash(nueva))
