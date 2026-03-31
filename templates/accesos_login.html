@@ -3,7 +3,28 @@
 
 <div class="container mt-4">
     <h2>🕒 Historial de Ingresos al Sistema</h2>
-    <p class="text-muted">Ultimos 200 inicios de sesion exitosos.</p>
+    <p class="text-muted">Ultimos 200 inicios de sesion exitosos. Puedes filtrar por usuario y rango de fechas.</p>
+
+    <div class="card p-3 mb-3 shadow-sm">
+        <form method="get" action="/admin/accesos" class="row g-2 align-items-end">
+            <div class="col-lg-4 col-md-6 col-12">
+                <label class="form-label">Usuario</label>
+                <input type="text" name="usuario" class="form-control" placeholder="Ej: admin" value="{{ filtros.usuario if filtros else '' }}">
+            </div>
+            <div class="col-lg-3 col-md-6 col-12">
+                <label class="form-label">Desde</label>
+                <input type="date" name="fecha_desde" class="form-control" value="{{ filtros.fecha_desde if filtros else '' }}">
+            </div>
+            <div class="col-lg-3 col-md-6 col-12">
+                <label class="form-label">Hasta</label>
+                <input type="date" name="fecha_hasta" class="form-control" value="{{ filtros.fecha_hasta if filtros else '' }}">
+            </div>
+            <div class="col-lg-2 col-md-6 col-12 d-flex gap-2">
+                <button class="btn btn-primary" type="submit">Filtrar</button>
+                <a href="/admin/accesos" class="btn btn-outline-secondary">Limpiar</a>
+            </div>
+        </form>
+    </div>
 
     <div class="card p-3 shadow">
         <div class="table-responsive">

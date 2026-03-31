@@ -298,10 +298,39 @@ def accesos_login_admin():
     if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
         return render_template("acceso_denegado.html"), 403
 
+    usuario_filtro = (request.args.get("usuario") or "").strip()
+    fecha_desde = (request.args.get("fecha_desde") or "").strip()
+    fecha_hasta = (request.args.get("fecha_hasta") or "").strip()
+
+    for campo, valor in (("fecha_desde", fecha_desde), ("fecha_hasta", fecha_hasta)):
+        if valor:
+            try:
+                datetime.strptime(valor, "%Y-%m-%d")
+            except ValueError:
+                flash(f"Formato invalido en {campo}. Usa YYYY-MM-DD", "error")
+                return redirect("/admin/accesos")
+
+    if fecha_desde and fecha_hasta and fecha_desde > fecha_hasta:
+        flash("El rango de fechas es invalido", "error")
+        return redirect("/admin/accesos")
+
     try:
-        accesos = get_accesos_login(200)
+        accesos = get_accesos_login(
+            200,
+            username=usuario_filtro or None,
+            fecha_desde=fecha_desde or None,
+            fecha_hasta=fecha_hasta or None,
+        )
     except Exception as e:
         flash(f"No se pudo cargar el historial de accesos: {str(e)}", "error")
         accesos = []
 
-    return render_template("accesos_login.html", accesos=accesos)
+    return render_template(
+        "accesos_login.html",
+        accesos=accesos,
+        filtros={
+            "usuario": usuario_filtro,
+            "fecha_desde": fecha_desde,
+            "fecha_hasta": fecha_hasta,
+        },
+    )

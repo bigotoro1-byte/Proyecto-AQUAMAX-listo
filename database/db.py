@@ -523,18 +523,32 @@ def registrar_acceso_login(username, rol=None, ip=None, user_agent=None):
         conn.close()
 
 
-def get_accesos_login(limit=100):
+def get_accesos_login(limit=100, username=None, fecha_desde=None, fecha_hasta=None):
     conn = conectar()
     cursor = conn.cursor()
-    cursor.execute(
-        """
+    query = """
         SELECT username, rol, ip, user_agent, fecha
         FROM accesos_login
-        ORDER BY fecha DESC
-        LIMIT %s
-        """,
-        (limit,),
-    )
+        WHERE 1=1
+    """
+    params = []
+
+    if username:
+        query += " AND LOWER(username) LIKE LOWER(%s)"
+        params.append(f"%{username.strip()}%")
+
+    if fecha_desde:
+        query += " AND fecha >= %s::date"
+        params.append(fecha_desde)
+
+    if fecha_hasta:
+        query += " AND fecha < (%s::date + INTERVAL '1 day')"
+        params.append(fecha_hasta)
+
+    query += " ORDER BY fecha DESC LIMIT %s"
+    params.append(limit)
+
+    cursor.execute(query, tuple(params))
     data = cursor.fetchall()
     conn.close()
     return data
