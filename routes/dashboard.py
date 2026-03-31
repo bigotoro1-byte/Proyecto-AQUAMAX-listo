@@ -21,11 +21,11 @@ def dashboard():
     cfg_prod = get_configuracion_stock_producto_map_por_nombre()
 
     cursor.execute("""
-    SELECT p.nombre, IFNULL(SUM(i.cantidad), 0)
+    SELECT p.nombre, COALESCE(SUM(i.cantidad), 0)
     FROM productos p
     LEFT JOIN inventario i ON p.id = i.producto
     GROUP BY p.id, p.nombre
-    HAVING IFNULL(SUM(i.cantidad), 0) > 0
+    HAVING COALESCE(SUM(i.cantidad), 0) > 0
     """)
     data = cursor.fetchall()
 
@@ -83,7 +83,7 @@ def reporte():
 
     # 🔽 query principal
     query = """
-        SELECT p.nombre, IFNULL(i.piscina, 'Sin movimiento'), IFNULL(SUM(i.cantidad), 0)
+        SELECT p.nombre, COALESCE(i.piscina, 'Sin movimiento'), COALESCE(SUM(i.cantidad), 0)
         FROM productos p
         LEFT JOIN inventario i ON p.id = i.producto
         WHERE 1=1
@@ -92,11 +92,11 @@ def reporte():
     params = []
 
     if producto:
-        query += " AND p.nombre = ?"
+        query += " AND p.nombre = %s"
         params.append(producto)
 
     if ubicacion:
-        query += " AND i.piscina = ?"
+        query += " AND i.piscina = %s"
         params.append(ubicacion)
 
     query += " GROUP BY p.nombre, i.piscina"
@@ -113,13 +113,13 @@ def reporte():
     """
     mov_params = []
     if rol_actual != "admin":
-        mov_query += " AND m.usuario = ?"
+        mov_query += " AND m.usuario = %s"
         mov_params.append(usuario_actual)
     if producto:
-        mov_query += " AND p.nombre = ?"
+        mov_query += " AND p.nombre = %s"
         mov_params.append(producto)
     if ubicacion:
-        mov_query += " AND m.ubicacion = ?"
+        mov_query += " AND m.ubicacion = %s"
         mov_params.append(ubicacion)
     mov_query += " ORDER BY m.id DESC"
 
@@ -186,11 +186,11 @@ def generar_pdf():
     params = []
 
     if producto:
-        query += " AND p.nombre = ?"
+        query += " AND p.nombre = %s"
         params.append(producto)
 
     if ubicacion:
-        query += " AND i.piscina = ?"
+        query += " AND i.piscina = %s"
         params.append(ubicacion)
 
     query += " GROUP BY COALESCE(p.nombre, i.producto), i.piscina"
@@ -210,15 +210,15 @@ def generar_pdf():
     mov_params = []
 
     if rol_actual != "admin":
-        mov_query += " AND m.usuario = ?"
+        mov_query += " AND m.usuario = %s"
         mov_params.append(usuario_actual)
 
     if producto:
-        mov_query += " AND p.nombre = ?"
+        mov_query += " AND p.nombre = %s"
         mov_params.append(producto)
 
     if ubicacion:
-        mov_query += " AND m.ubicacion = ?"
+        mov_query += " AND m.ubicacion = %s"
         mov_params.append(ubicacion)
 
     mov_query += " ORDER BY m.id DESC"

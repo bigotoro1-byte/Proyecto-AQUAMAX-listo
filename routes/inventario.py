@@ -97,7 +97,7 @@ def salida():
         conn = conectar()
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT IFNULL(SUM(cantidad), 0) FROM inventario WHERE producto = ? AND piscina = 'GENERAL'",
+            "SELECT COALESCE(SUM(cantidad), 0) FROM inventario WHERE producto = %s AND piscina = 'GENERAL'",
             (producto_id,)
         )
         stock_general = float(cursor.fetchone()[0] or 0)

@@ -42,7 +42,7 @@ def usuarios():
 
         try:
             cursor.execute(
-                "INSERT INTO usuarios VALUES (?, ?, ?)",
+                "INSERT INTO usuarios (username, password, rol) VALUES (%s, %s, %s)",
                 (user, generate_password_hash(password), rol)
             )
             conn.commit()

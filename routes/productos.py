@@ -38,7 +38,7 @@ def productos():
 
         else:
             cursor.execute(
-                "SELECT 1 FROM productos WHERE UPPER(TRIM(nombre)) = UPPER(TRIM(?))",
+                "SELECT 1 FROM productos WHERE UPPER(TRIM(nombre)) = UPPER(TRIM(%s))",
                 (producto,)
             )
             existe_nombre = cursor.fetchone()
@@ -48,7 +48,7 @@ def productos():
             else:
                 codigo_generado = generar_codigo_producto(cursor)
                 cursor.execute(
-                    "INSERT INTO productos (id, nombre, tipo, fecha, usuario) VALUES (?, ?, ?, ?, ?)",
+                    "INSERT INTO productos (id, nombre, tipo, fecha, usuario) VALUES (%s, %s, %s, %s, %s)",
                     (codigo_generado, producto, tipo, fecha, usuario)
                 )
                 conn.commit()
