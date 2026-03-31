@@ -36,7 +36,8 @@ def _send_recovery_email(user, email, codigo):
     )
 
     resend_api_key = (os.getenv('RESEND_API_KEY') or '').strip()
-    mail_from = os.getenv('MAIL_FROM', 'onboarding@resend.dev')
+    resend_from = (os.getenv('RESEND_FROM') or '').strip() or 'onboarding@resend.dev'
+    smtp_from = os.getenv('MAIL_FROM', 'aquamax@tuempresa.com')
 
     # 1) Intento principal: Resend API (HTTPS/443).
     if resend_api_key:
@@ -48,7 +49,7 @@ def _send_recovery_email(user, email, codigo):
                     'Content-Type': 'application/json',
                 },
                 json={
-                    'from': mail_from,
+                    'from': resend_from,
                     'to': [email],
                     'subject': subject,
                     'text': body,
@@ -75,7 +76,7 @@ def _send_recovery_email(user, email, codigo):
     try:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
-        msg['From'] = mail_from
+        msg['From'] = smtp_from
         msg['To'] = email
         msg_text = MIMEText(body, 'plain', 'utf-8')
         msg.attach(msg_text)
