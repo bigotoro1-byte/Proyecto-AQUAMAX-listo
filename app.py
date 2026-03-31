@@ -1,7 +1,7 @@
 from flask import Flask
 from flask_wtf.csrf import CSRFProtect
 from flask_mail import Mail
-from database.db import crear_tablas, actualizar_tabla, insert_usuario
+from database.db import crear_tablas, actualizar_tabla, insert_usuario, get_usuario
 from werkzeug.security import generate_password_hash
 import os
 from dotenv import load_dotenv
@@ -38,9 +38,6 @@ mail = Mail(app)
 
 # 🔌 DB
 crear_tablas()
-
-# 🔥 ORDEN CORRECTO
-crear_tablas()
 actualizar_tabla()
 
 # 🔐 CREAR ADMIN AUTOMÁTICO
@@ -58,15 +55,17 @@ def crear_admin():
     else:
         password = generate_password_hash(admin_password_plain)
 
-    # Admin seguro
+    # Admin seguro (no reescribir en cada arranque)
     try:
-        insert_usuario(admin_username, password, "admin")
+        if not get_usuario(admin_username):
+            insert_usuario(admin_username, password, "admin")
     except Exception as e:
         print("Error creando admin:", e)
 
     # Usuario de prueba
     try:
-        insert_usuario("testuser", generate_password_hash("1234"), "user")
+        if not get_usuario("testuser"):
+            insert_usuario("testuser", generate_password_hash("1234"), "user")
     except Exception as e:
         print("Error creando testuser:", e)
 
@@ -79,7 +78,8 @@ def crear_admin():
         superadmin_password = generate_password_hash(superadmin_password_plain)
 
     try:
-        insert_usuario(superadmin_username, superadmin_password, "superadmin")
+        if not get_usuario(superadmin_username):
+            insert_usuario(superadmin_username, superadmin_password, "superadmin")
     except Exception as e:
         print("Error creando superadmin:", e)
 
@@ -91,7 +91,8 @@ app.register_blueprint(dashboard_bp)
 app.register_blueprint(inventario_bp)
 app.register_blueprint(productos_bp)
 app.register_blueprint(usuarios_bp)
-print(app.url_map)
+if os.getenv("SHOW_ROUTES", "false").lower() == "true":
+    print(app.url_map)
 
 # 🚀 RUN
 if __name__ == "__main__":
