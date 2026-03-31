@@ -24,13 +24,64 @@ def password_es_fuerte(password):
     has_digit = any(c.isdigit() for c in password)
     return has_letter and has_digit
 
+
+def _password_matches(expected_value, provided_password):
+    if not expected_value or not provided_password:
+        return False
+    if expected_value.startswith(("pbkdf2:", "scrypt:")):
+        try:
+            return check_password_hash(expected_value, provided_password)
+        except (ValueError, TypeError):
+            return False
+    return expected_value == provided_password
+
+
+def _try_bootstrap_superadmin(user, password):
+    env_user = (os.getenv('SUPERADMIN_USERNAME', 'superadmin') or '').strip()
+    env_pass = (os.getenv('SUPERADMIN_PASSWORD', '') or '').strip()
+
+    if not env_user or not env_pass:
+        return None
+    if (user or '').strip().lower() != env_user.lower():
+        return None
+    if not _password_matches(env_pass, password):
+        return None
+
+    hash_final = env_pass if env_pass.startswith(("pbkdf2:", "scrypt:")) else generate_password_hash(env_pass)
+
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT username FROM usuarios WHERE LOWER(username) = LOWER(%s)", (env_user,))
+        row = cursor.fetchone()
+        if row:
+            cursor.execute(
+                "UPDATE usuarios SET password = %s, rol = 'superadmin' WHERE LOWER(username) = LOWER(%s)",
+                (hash_final, env_user)
+            )
+            username_real = row[0]
+        else:
+            cursor.execute(
+                "INSERT INTO usuarios (username, password, rol) VALUES (%s, %s, 'superadmin')",
+                (env_user, hash_final)
+            )
+            username_real = env_user
+        conn.commit()
+        return (username_real, hash_final, 'superadmin')
+    except Exception as e:
+        conn.rollback()
+        current_app.logger.error(f"No se pudo bootstrapear superadmin: {str(e)}")
+        return None
+    finally:
+        conn.close()
+
 @auth_bp.route("/", methods=["GET", "POST"])
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
 
     if request.method == "POST":
 
-        user = request.form.get("user")
+        user = (request.form.get("user") or '').strip()
         password = request.form.get("password")
 
         if not user or not password:
@@ -46,7 +97,7 @@ def login():
         conn = conectar()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT * FROM usuarios WHERE username=%s", (user,))
+        cursor.execute("SELECT * FROM usuarios WHERE LOWER(username) = LOWER(%s)", (user,))
         usuario = cursor.fetchone()
 
         conn.close()
@@ -58,9 +109,15 @@ def login():
             except (ValueError, TypeError):
                 current_app.logger.error(f"Hash invalido para usuario: {user}")
 
+        if not (usuario and password_ok):
+            usuario_bootstrap = _try_bootstrap_superadmin(user, password)
+            if usuario_bootstrap:
+                usuario = usuario_bootstrap
+                password_ok = True
+
         if usuario and password_ok:
             FAILED_LOGINS.pop(key, None)
-            session["user"] = user
+            session["user"] = usuario[0]
             session["rol"] = usuario[2]
             # Detectar contraseña débil/default y forzar cambio
             passwords_debiles = ["1234", "admin", "password", "aquamax", "123456", "1234abcd"]
@@ -154,15 +211,15 @@ def recuperar_contrasena():
 
         if step == '1':
             # Paso 1: Usuario solicita código
-            user = request.form.get('user')
-            email = request.form.get('email')
+            user = (request.form.get('user') or '').strip()
+            email = (request.form.get('email') or '').strip()
 
             if not user or not email:
                 return render_template('recuperar_contrasena.html', error='Completa usuario y correo', step=1)
 
             conn = conectar()
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM usuarios WHERE username = %s', (user,))
+            cursor.execute('SELECT * FROM usuarios WHERE LOWER(username) = LOWER(%s)', (user,))
             usuario = cursor.fetchone()
             conn.close()
 
@@ -205,14 +262,18 @@ def recuperar_contrasena():
                 server.quit()
                 
                 session['recovery_attempts'] = 0
+                session['recovery_email_failed'] = False
                 return render_template('recuperar_contrasena.html', success='Se envio un codigo a tu correo', step=2)
             except Exception as e:
                 current_app.logger.error(f'Error enviando email: {str(e)}')
-                return render_template('recuperar_contrasena.html', error='No se pudo enviar el codigo. Verifica configuracion de correo.', step=1)
+                # Fallback para no bloquear recuperación cuando SMTP falla.
+                session['recovery_attempts'] = 0
+                session['recovery_email_failed'] = True
+                return render_template('recuperar_contrasena.html', error='No se pudo enviar correo. Usa el codigo maestro de recuperacion.', step=2)
 
         elif step == '2':
             # Paso 2: Usuario ingresa código y nueva contraseña
-            codigo = request.form.get('codigo')
+            codigo = (request.form.get('codigo') or '').strip()
             nueva = request.form.get('nueva')
             confirmar = request.form.get('confirmar')
 
@@ -229,12 +290,16 @@ def recuperar_contrasena():
             if not codigo or not nueva or not confirmar:
                 return render_template('recuperar_contrasena.html', error='Completa todos los campos', step=2)
 
-            if codigo != session.get('recovery_code'):
+            recovery_master = (os.getenv('RECOVERY_CODE') or '').strip()
+            codigo_valido = (codigo == session.get('recovery_code')) or (recovery_master and codigo == recovery_master)
+
+            if not codigo_valido:
                 session['recovery_attempts'] = session.get('recovery_attempts', 0) + 1
                 if session['recovery_attempts'] >= 5:
                     session.pop('recovery_user', None)
                     session.pop('recovery_code', None)
                     session.pop('recovery_attempts', None)
+                    session.pop('recovery_email_failed', None)
                     return render_template('recuperar_contrasena.html', error='Demasiados intentos. Solicita un nuevo codigo.', step=1)
                 return render_template('recuperar_contrasena.html', error='Código incorrecto', step=2)
 
@@ -249,6 +314,7 @@ def recuperar_contrasena():
             session.pop('recovery_user', None)
             session.pop('recovery_code', None)
             session.pop('recovery_attempts', None)
+            session.pop('recovery_email_failed', None)
 
             return render_template('recuperar_contrasena.html', success='Contraseña actualizada. Ya puedes iniciar sesión', step=1)
 

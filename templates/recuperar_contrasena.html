@@ -32,7 +32,11 @@
     <form method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="step" value="2">
+        {% if session.get('recovery_email_failed') %}
+        <div class="alert alert-warning">No se pudo enviar correo. Ingresa el codigo maestro configurado en el sistema.</div>
+        {% else %}
         <div class="alert alert-info">Se envio un codigo a tu correo. Valido por 15 minutos.</div>
+        {% endif %}
         
         <div class="mb-3">
             <label class="form-label text-dark fw-semibold">Codigo de recuperacion (6 digitos)</label>
