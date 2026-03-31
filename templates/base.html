@@ -371,23 +371,17 @@ function toggleMenu() {
     const sidebar = document.getElementById("sidebar");
     if (sidebar) {
         sidebar.classList.toggle("active");
-
-    function toggleSidebar() {
-        const sidebar = document.getElementById("sidebar");
-        if (sidebar) {
-            sidebar.classList.toggle("collapsed");
     }
 }
-            const isCollapsed = sidebar.classList.contains("collapsed");
+
 function toggleSidebar() {
     const sidebar = document.getElementById("sidebar");
-    if (sidebar) {
-        sidebar.classList.toggle("collapsed");
-        const isCollapsed = sidebar.classList.contains("collapsed");
-        localStorage.setItem("sidebarCollapsed", isCollapsed ? "true" : "false");
-        if (sidebar) {
+    if (!sidebar) return;
+    sidebar.classList.toggle("collapsed");
+    const isCollapsed = sidebar.classList.contains("collapsed");
+    localStorage.setItem("sidebarCollapsed", isCollapsed ? "true" : "false");
 }
-            const isCollapsed = localStorage.getItem("sidebarCollapsed") === "true";
+
 document.addEventListener("DOMContentLoaded", function () {
     const sidebar = document.getElementById("sidebar");
     if (!sidebar) return;
@@ -402,7 +396,13 @@ document.addEventListener("DOMContentLoaded", function () {
         link.addEventListener("click", function () {
             if (window.matchMedia("(max-width: 768px)").matches) {
                 sidebar.classList.remove("active");
-document.addEventListener("DOMContentLoaded", function () {
+            }
+        });
+    });
+});
+
+(function () {
+    const overlay = document.getElementById("appLoading");
     const textEl = document.getElementById("appLoadingText");
     if (!overlay || !textEl) return;
 
@@ -418,8 +418,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     window.AQUAMAXShowLoading = showLoading;
-
-    // Evita que el overlay quede pegado al volver desde cache del navegador.
     window.addEventListener("pageshow", hideLoading);
 
     document.addEventListener("click", function (event) {
@@ -452,9 +450,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const elapsedEl = document.getElementById("sessionElapsed");
     const remainingEl = document.getElementById("sessionRemaining");
-    const loginTs = parseInt(box.dataset.loginTs || "0", 10);
-    let lastActivityTs = parseInt(box.dataset.lastActivityTs || "0", 10);
     const timeoutSeconds = parseInt(box.dataset.timeoutSeconds || "1800", 10);
+    let loginTs = parseInt(box.dataset.loginTs || "0", 10);
+    let lastActivityTs = parseInt(box.dataset.lastActivityTs || "0", 10);
+
+    const nowInit = Math.floor(Date.now() / 1000);
+    if (!Number.isFinite(loginTs) || loginTs <= 0) loginTs = nowInit;
+    if (!Number.isFinite(lastActivityTs) || lastActivityTs <= 0) lastActivityTs = nowInit;
 
     function pad(n) {
         return String(n).padStart(2, "0");
@@ -475,13 +477,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function tick() {
         const now = Math.floor(Date.now() / 1000);
-
-        if (loginTs > 0 && elapsedEl) {
+        if (elapsedEl) {
             const elapsed = Math.max(0, now - loginTs);
             elapsedEl.textContent = formatHMS(elapsed);
         }
 
-        if (lastActivityTs > 0 && remainingEl) {
+        if (remainingEl) {
             const remaining = Math.max(0, timeoutSeconds - (now - lastActivityTs));
             remainingEl.textContent = formatMS(remaining);
             if (remaining <= 0) {
@@ -490,8 +491,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // Si hay interacción local, mantiene el contador de frontend alineado
-    // con la renovación por actividad que hace el backend en cada request.
     document.addEventListener("click", function () {
         lastActivityTs = Math.floor(Date.now() / 1000);
     });
