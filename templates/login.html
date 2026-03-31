@@ -50,7 +50,7 @@ body {
 </div>
 {% endif %}
 
-<form method="POST" action="/login">
+<form method="POST" action="/login" data-loading-text="Verificando acceso...">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <input type="text" name="user" class="form-control mb-3" placeholder="Usuario" required>
