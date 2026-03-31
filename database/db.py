@@ -5,19 +5,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_db_path():
-    raw_url = os.getenv('DATABASE_URL', 'sqlite:///data/database/inventario.db')
-    db_path = raw_url.replace('sqlite:///', '')
+    raw_url = os.getenv('DATABASE_URL')
 
-    # Asegura que exista el directorio destino antes de conectar SQLite.
-    db_dir = os.path.dirname(db_path)
-    if db_dir:
-        try:
-            os.makedirs(db_dir, exist_ok=True)
-            return db_path
-        except OSError:
-            pass
+    # Si hay ruta explícita (ej. Render con disco), usarla obligatoriamente
+    # para no escribir en almacenamiento efimero y perder datos en deploy.
+    if raw_url:
+        db_path = raw_url.replace('sqlite:///', '')
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            try:
+                os.makedirs(db_dir, exist_ok=True)
+            except OSError as e:
+                raise RuntimeError(
+                    f"No se pudo preparar el directorio de la base de datos configurada: {db_dir}"
+                ) from e
+        return db_path
 
-    # Fallback seguro para entornos donde /var/data no este disponible.
+    # Fallback local solo para desarrollo.
     fallback_path = os.path.join('data', 'database', 'inventario.db')
     os.makedirs(os.path.dirname(fallback_path), exist_ok=True)
     return fallback_path
