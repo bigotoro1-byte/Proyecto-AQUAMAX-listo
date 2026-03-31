@@ -262,12 +262,16 @@ def recuperar_contrasena():
                 msg_text = MIMEText(cuerpo, 'plain', 'utf-8')
                 msg.attach(msg_text)
                 
-                # Enviar por SMTP
-                server = smtplib.SMTP(mail_server, mail_port)
-                server.starttls()
-                server.login(mail_user, mail_pass)
-                server.send_message(msg)
-                server.quit()
+                # Enviar por SMTP con timeout corto para evitar que el worker se cuelgue.
+                if not mail_user or not mail_pass:
+                    raise RuntimeError('MAIL_USERNAME o MAIL_PASSWORD no configurados')
+
+                with smtplib.SMTP(mail_server, mail_port, timeout=8) as server:
+                    server.ehlo()
+                    server.starttls()
+                    server.ehlo()
+                    server.login(mail_user, mail_pass)
+                    server.send_message(msg)
                 
                 session['recovery_attempts'] = 0
                 session['recovery_email_failed'] = False
