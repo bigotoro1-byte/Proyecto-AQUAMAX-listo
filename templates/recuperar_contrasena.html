@@ -34,6 +34,11 @@
         <input type="hidden" name="step" value="2">
         {% if session.get('recovery_email_failed') %}
         <div class="alert alert-warning">No se pudo enviar correo. Ingresa el codigo maestro configurado en el sistema.</div>
+        {% if envio_detalle or session.get('recovery_send_error') %}
+        <div class="alert alert-secondary" style="font-size: 13px;">
+            Detalle tecnico: {{ envio_detalle or session.get('recovery_send_error') }}
+        </div>
+        {% endif %}
         {% else %}
         <div class="alert alert-info">Se envio un codigo a tu correo. Valido por 15 minutos.</div>
         {% endif %}

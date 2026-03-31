@@ -57,12 +57,22 @@ def _send_recovery_email(user, email, codigo):
                 timeout=8,
             )
             if response.status_code in (200, 201, 202):
-                return True
+                return True, ''
             current_app.logger.error(
                 f'Resend fallo ({response.status_code}): {response.text[:300]}'
             )
+            detalle = f'Resend {response.status_code}'
+            try:
+                data = response.json()
+                msg = data.get('message') if isinstance(data, dict) else None
+                if msg:
+                    detalle = f'{detalle}: {msg}'
+            except Exception:
+                pass
+            return False, detalle
         except requests.RequestException as e:
             current_app.logger.error(f'Error Resend: {str(e)}')
+            return False, f'Resend red: {str(e)}'
 
     # 2) Fallback: SMTP clásico.
     mail_server = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
@@ -71,7 +81,7 @@ def _send_recovery_email(user, email, codigo):
     mail_pass = os.getenv('MAIL_PASSWORD')
 
     if not mail_user or not mail_pass:
-        return False
+        return False, 'SMTP sin credenciales'
 
     try:
         msg = MIMEMultipart('alternative')
@@ -87,10 +97,10 @@ def _send_recovery_email(user, email, codigo):
             server.ehlo()
             server.login(mail_user, mail_pass)
             server.send_message(msg)
-        return True
+        return True, ''
     except Exception as e:
         current_app.logger.error(f'Error SMTP fallback: {str(e)}')
-        return False
+        return False, f'SMTP: {str(e)}'
 
 
 def _password_matches(expected_value, provided_password):
@@ -310,14 +320,20 @@ def recuperar_contrasena():
             session['recovery_code_time'] = datetime.now().timestamp()
 
             # Enviar email con el código (Resend principal, SMTP fallback)
-            sent = _send_recovery_email(user, email, codigo)
+            sent, envio_detalle = _send_recovery_email(user, email, codigo)
             session['recovery_attempts'] = 0
             if sent:
                 session['recovery_email_failed'] = False
                 return render_template('recuperar_contrasena.html', success='Se envio un codigo a tu correo', step=2)
 
             session['recovery_email_failed'] = True
-            return render_template('recuperar_contrasena.html', error='No se pudo enviar correo. Usa el codigo maestro de recuperacion.', step=2)
+            session['recovery_send_error'] = (envio_detalle or 'Error no especificado')[:200]
+            return render_template(
+                'recuperar_contrasena.html',
+                error='No se pudo enviar correo. Usa el codigo maestro de recuperacion.',
+                step=2,
+                envio_detalle=session.get('recovery_send_error')
+            )
 
         elif step == '2':
             # Paso 2: Usuario ingresa código y nueva contraseña
@@ -333,6 +349,7 @@ def recuperar_contrasena():
                 session.pop('recovery_user', None)
                 session.pop('recovery_code', None)
                 session.pop('recovery_attempts', None)
+                session.pop('recovery_send_error', None)
                 return render_template('recuperar_contrasena.html', error='El codigo expiro. Solicita uno nuevo.', step=1)
 
             if not codigo or not nueva or not confirmar:
@@ -348,6 +365,7 @@ def recuperar_contrasena():
                     session.pop('recovery_code', None)
                     session.pop('recovery_attempts', None)
                     session.pop('recovery_email_failed', None)
+                    session.pop('recovery_send_error', None)
                     return render_template('recuperar_contrasena.html', error='Demasiados intentos. Solicita un nuevo codigo.', step=1)
                 return render_template('recuperar_contrasena.html', error='Código incorrecto', step=2)
 
@@ -367,6 +385,7 @@ def recuperar_contrasena():
             session.pop('recovery_code', None)
             session.pop('recovery_attempts', None)
             session.pop('recovery_email_failed', None)
+            session.pop('recovery_send_error', None)
 
             return render_template('recuperar_contrasena.html', success='Contraseña actualizada. Ya puedes iniciar sesión', step=1)
 
