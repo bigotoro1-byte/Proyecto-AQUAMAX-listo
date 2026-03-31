@@ -162,6 +162,7 @@ def crear_tablas():
         username TEXT PRIMARY KEY,
         email TEXT,
         codigo TEXT,
+        codigo_hash TEXT,
         intentos INTEGER NOT NULL DEFAULT 0,
         expires_at TIMESTAMP,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -237,6 +238,7 @@ def actualizar_tabla():
                 username TEXT PRIMARY KEY,
                 email TEXT,
                 codigo TEXT,
+                codigo_hash TEXT,
                 intentos INTEGER NOT NULL DEFAULT 0,
                 expires_at TIMESTAMP,
                 created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -244,6 +246,7 @@ def actualizar_tabla():
             )
             """
         )
+        cursor.execute("ALTER TABLE password_recovery_state ADD COLUMN IF NOT EXISTS codigo_hash TEXT")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_auth_login_state_blocked_until ON auth_login_state(blocked_until)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_password_recovery_state_expires_at ON password_recovery_state(expires_at)")
         conn.commit()
@@ -641,22 +644,23 @@ def register_failed_login(username, max_attempts, lockout_seconds):
         conn.close()
 
 
-def save_password_recovery_state(username, email, codigo, expires_minutes=15):
+def save_password_recovery_state(username, email, codigo_hash, expires_minutes=15):
     conn = conectar()
     cursor = conn.cursor()
     try:
         cursor.execute(
             """
-            INSERT INTO password_recovery_state (username, email, codigo, intentos, expires_at, created_at, updated_at)
-            VALUES (%s, %s, %s, 0, NOW() + (%s * INTERVAL '1 minute'), NOW(), NOW())
+            INSERT INTO password_recovery_state (username, email, codigo, codigo_hash, intentos, expires_at, created_at, updated_at)
+            VALUES (%s, %s, NULL, %s, 0, NOW() + (%s * INTERVAL '1 minute'), NOW(), NOW())
             ON CONFLICT (username) DO UPDATE SET
                 email = EXCLUDED.email,
-                codigo = EXCLUDED.codigo,
+                codigo = NULL,
+                codigo_hash = EXCLUDED.codigo_hash,
                 intentos = 0,
                 expires_at = NOW() + (%s * INTERVAL '1 minute'),
                 updated_at = NOW()
             """,
-            (username, email, codigo, int(expires_minutes), int(expires_minutes)),
+            (username, email, codigo_hash, int(expires_minutes), int(expires_minutes)),
         )
         conn.commit()
     except Exception as e:
@@ -670,7 +674,7 @@ def get_password_recovery_state(username):
     conn = conectar()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT email, codigo, intentos, expires_at FROM password_recovery_state WHERE LOWER(username) = LOWER(%s)",
+        "SELECT email, codigo_hash, intentos, expires_at, codigo FROM password_recovery_state WHERE LOWER(username) = LOWER(%s)",
         (username,),
     )
     row = cursor.fetchone()

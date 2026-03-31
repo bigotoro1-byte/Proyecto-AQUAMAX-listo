@@ -22,6 +22,8 @@ secret_key = os.getenv('SECRET_KEY')
 if not secret_key:
     raise RuntimeError('SECRET_KEY no está configurado en .env. Define SECRET_KEY y reinicia la aplicación.')
 app.secret_key = secret_key
+is_development = os.getenv('FLASK_ENV', '').strip().lower() == 'development'
+allow_weak_defaults = os.getenv('ALLOW_WEAK_DEFAULTS', 'false').strip().lower() == 'true' or is_development
 
 # Cierre automatico de sesion por inactividad (minutos)
 session_timeout_minutes = int(os.getenv('SESSION_TIMEOUT_MINUTES', '6'))
@@ -89,45 +91,59 @@ actualizar_tabla()
 # 🔐 CREAR ADMIN AUTOMÁTICO
 def crear_admin():
     admin_username = os.getenv('ADMIN_USERNAME', 'admin').strip() or 'admin'
-    admin_password_plain = os.getenv('ADMIN_PASSWORD', '1234').strip()
+    admin_password_plain = (os.getenv('ADMIN_PASSWORD') or '').strip()
 
     # Si la variable no se ha definido/actualizado en .env
     if not admin_password_plain or admin_password_plain.lower() == 'hashed_password_here':
-        admin_password_plain = '1234'
+        if allow_weak_defaults:
+            admin_password_plain = '1234'
+        else:
+            admin_password_plain = None
+            print('ADMIN_PASSWORD no configurado. Se omite creación automática de admin por seguridad.')
 
-    # Si viene un hash preconstruido, no lo volverse a hashear
-    if admin_password_plain.startswith(('pbkdf2:', 'scrypt:')):
-        password = admin_password_plain
-    else:
-        password = generate_password_hash(admin_password_plain)
+    if admin_password_plain:
+        # Si viene un hash preconstruido, no volverlo a hashear
+        if admin_password_plain.startswith(('pbkdf2:', 'scrypt:')):
+            password = admin_password_plain
+        else:
+            password = generate_password_hash(admin_password_plain)
 
-    # Admin seguro (no reescribir en cada arranque)
-    try:
-        if not get_usuario(admin_username):
-            insert_usuario(admin_username, password, "admin")
-    except Exception as e:
-        print("Error creando admin:", e)
+        # Admin seguro (no reescribir en cada arranque)
+        try:
+            if not get_usuario(admin_username):
+                insert_usuario(admin_username, password, "admin")
+        except Exception as e:
+            print("Error creando admin:", e)
 
     # Usuario de prueba
-    try:
-        if not get_usuario("testuser"):
-            insert_usuario("testuser", generate_password_hash("1234"), "user")
-    except Exception as e:
-        print("Error creando testuser:", e)
+    create_test_user = os.getenv('CREATE_TEST_USER', 'false').strip().lower() == 'true'
+    if create_test_user:
+        try:
+            if not get_usuario("testuser"):
+                insert_usuario("testuser", generate_password_hash("1234"), "user")
+        except Exception as e:
+            print("Error creando testuser:", e)
 
     # Super administrador del sistema
     superadmin_username = os.getenv('SUPERADMIN_USERNAME', 'superadmin').strip() or 'superadmin'
-    superadmin_password_plain = os.getenv('SUPERADMIN_PASSWORD', '1234').strip() or '1234'
-    if superadmin_password_plain.startswith(('pbkdf2:', 'scrypt:')):
-        superadmin_password = superadmin_password_plain
-    else:
-        superadmin_password = generate_password_hash(superadmin_password_plain)
+    superadmin_password_plain = (os.getenv('SUPERADMIN_PASSWORD') or '').strip()
+    if not superadmin_password_plain:
+        if allow_weak_defaults:
+            superadmin_password_plain = '1234'
+        else:
+            print('SUPERADMIN_PASSWORD no configurado. Se omite creación automática de superadmin por seguridad.')
 
-    try:
-        if not get_usuario(superadmin_username):
-            insert_usuario(superadmin_username, superadmin_password, "superadmin")
-    except Exception as e:
-        print("Error creando superadmin:", e)
+    if superadmin_password_plain:
+        if superadmin_password_plain.startswith(('pbkdf2:', 'scrypt:')):
+            superadmin_password = superadmin_password_plain
+        else:
+            superadmin_password = generate_password_hash(superadmin_password_plain)
+
+        try:
+            if not get_usuario(superadmin_username):
+                insert_usuario(superadmin_username, superadmin_password, "superadmin")
+        except Exception as e:
+            print("Error creando superadmin:", e)
 
 crear_admin()
 
@@ -142,4 +158,5 @@ if os.getenv("SHOW_ROUTES", "false").lower() == "true":
 
 # 🚀 RUN
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    debug_mode = os.getenv('FLASK_DEBUG', 'false').strip().lower() == 'true'
+    app.run(debug=debug_mode, port=int(os.getenv('PORT', '5001')))

@@ -367,7 +367,8 @@ def recuperar_contrasena():
             if sent:
                 session['recovery_user'] = usuario[0]
                 try:
-                    save_password_recovery_state(usuario[0], email_registrado, codigo, 15)
+                    codigo_hash = generate_password_hash(codigo)
+                    save_password_recovery_state(usuario[0], email_registrado, codigo_hash, 15)
                 except Exception as e:
                     current_app.logger.error(f'Error guardando recuperacion en BD: {str(e)}')
                     return render_template('recuperar_contrasena.html', error='No se pudo guardar la solicitud de recuperacion. Intenta nuevamente.', step=1)
@@ -405,7 +406,13 @@ def recuperar_contrasena():
             if not codigo or not nueva or not confirmar:
                 return render_template('recuperar_contrasena.html', error='Completa todos los campos', step=2)
 
-            codigo_valido = (codigo == (recovery_state[1] or ''))
+            codigo_hash = recovery_state[1]
+            codigo_legacy = recovery_state[4] if len(recovery_state) > 4 else None
+            if codigo_hash:
+                codigo_valido = check_password_hash(codigo_hash, codigo)
+            else:
+                # Compatibilidad para registros legacy previos al hash.
+                codigo_valido = (codigo == (codigo_legacy or ''))
 
             if not codigo_valido:
                 intentos = increment_password_recovery_attempts(recovery_user) or 0

@@ -13,9 +13,31 @@ usuarios_bp = Blueprint("usuarios", __name__, url_prefix="/admin")
 
 def _append_table_sheet(cursor, wb, table_name):
     ws = wb.create_sheet(title=table_name[:31])
-    cursor.execute(f"SELECT * FROM {table_name}")
+    columnas_excluidas = {
+        "usuarios": {"password"},
+        "password_recovery_state": {"codigo", "codigo_hash"},
+    }
+
+    cursor.execute(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = %s
+        ORDER BY ordinal_position
+        """,
+        (table_name,),
+    )
+    columnas = [r[0] for r in cursor.fetchall()]
+    columnas = [c for c in columnas if c not in columnas_excluidas.get(table_name, set())]
+
+    if not columnas:
+        ws.append(["sin_columnas"])
+        return
+
+    columnas_sql = ", ".join(f'"{c}"' for c in columnas)
+    cursor.execute(f'SELECT {columnas_sql} FROM "{table_name}"')
     rows = cursor.fetchall()
-    headers = [desc[0] for desc in (cursor.description or [])]
+    headers = list(columnas)
 
     if headers:
         ws.append(headers)
