@@ -1,31 +1,59 @@
 {% extends "base.html" %}
 {% block content %}
 
+<style>
+    .bg-light-success {
+        background-color: #e8f5e9 !important;
+        color: #1b5e20;
+    }
+    .border-success {
+        border-color: #4caf50 !important;
+    }
+    .bg-light-warning {
+        background-color: #fff3e0 !important;
+        color: #e65100;
+    }
+    .border-warning {
+        border-color: #ff9800 !important;
+    }
+    .bg-light-danger {
+        background-color: #ffebee !important;
+        color: #b71c1c;
+    }
+    .border-danger {
+        border-color: #f44336 !important;
+    }
+</style>
+
 <div class="container mt-4">
     <h2 class="mb-3">🩺 Salud del Sistema</h2>
     <p class="text-muted">Estado operativo en tiempo real para administración.</p>
 
     <div class="row g-3 mb-4">
+        <!-- Tamaño DB: verde <500MB, amarillo 500-900MB, rojo >=900MB -->
         <div class="col-lg-3 col-md-6 col-12">
-            <div class="card p-3 h-100">
+            <div class="card p-3 h-100 {% if salud.db_size_bytes < 524288000 %}border-success bg-light-success{% elif salud.db_size_bytes < 943718400 %}border-warning bg-light-warning{% else %}border-danger bg-light-danger{% endif %}" style="border-width: 3px;">
                 <div class="text-muted small">Tamaño DB</div>
                 <div class="h4 mb-0">{{ db_size }}</div>
             </div>
         </div>
+        <!-- Sesiones activas: verde <=5, amarillo 6-10, rojo >10 -->
         <div class="col-lg-3 col-md-6 col-12">
-            <div class="card p-3 h-100">
+            <div class="card p-3 h-100 {% if salud.sesiones_activas <= 5 %}border-success bg-light-success{% elif salud.sesiones_activas <= 10 %}border-warning bg-light-warning{% else %}border-danger bg-light-danger{% endif %}" style="border-width: 3px;">
                 <div class="text-muted small">Sesiones activas</div>
                 <div class="h4 mb-0">{{ salud.sesiones_activas }}</div>
             </div>
         </div>
+        <!-- Fallos login 24h: verde <=5, amarillo 6-20, rojo >20 -->
         <div class="col-lg-3 col-md-6 col-12">
-            <div class="card p-3 h-100">
+            <div class="card p-3 h-100 {% if salud.fallos_24h <= 5 %}border-success bg-light-success{% elif salud.fallos_24h <= 20 %}border-warning bg-light-warning{% else %}border-danger bg-light-danger{% endif %}" style="border-width: 3px;">
                 <div class="text-muted small">Fallos login (24h)</div>
                 <div class="h4 mb-0">{{ salud.fallos_24h }}</div>
             </div>
         </div>
+        <!-- Bloqueos activos: verde 0, amarillo 1-2, rojo >2 -->
         <div class="col-lg-3 col-md-6 col-12">
-            <div class="card p-3 h-100">
+            <div class="card p-3 h-100 {% if salud.bloqueos_activos == 0 %}border-success bg-light-success{% elif salud.bloqueos_activos <= 2 %}border-warning bg-light-warning{% else %}border-danger bg-light-danger{% endif %}" style="border-width: 3px;">
                 <div class="text-muted small">Bloqueos activos</div>
                 <div class="h4 mb-0">{{ salud.bloqueos_activos }}</div>
             </div>
