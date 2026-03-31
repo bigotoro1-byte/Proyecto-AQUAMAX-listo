@@ -15,6 +15,12 @@ def password_es_fuerte(password):
     return bool(re.search(r"[A-Za-z]", password) and re.search(r"\d", password))
 
 
+def email_valido(email):
+    if not email:
+        return False
+    return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email))
+
+
 # 🔐 LISTAR Y CREAR USUARIOS
 @usuarios_bp.route("/usuarios", methods=["GET", "POST"])
 def usuarios():
@@ -35,7 +41,7 @@ def usuarios():
         if not user or not password or not rol or not email:
             return render_template("usuarios.html", error="Completa todos los campos")
 
-        if "@" not in email or "." not in email.split("@")[-1]:
+        if not email_valido(email):
             return render_template("usuarios.html", error="Ingresa un correo valido")
 
         if not password_es_fuerte(password):
@@ -43,6 +49,10 @@ def usuarios():
 
         if rol == "superadmin" and session.get("rol") != "superadmin":
             return render_template("usuarios.html", error="Solo superadmin puede crear otro superadmin")
+
+        cursor.execute("SELECT 1 FROM usuarios WHERE LOWER(email) = LOWER(%s)", (email,))
+        if cursor.fetchone():
+            return render_template("usuarios.html", error="Ese correo ya esta asignado a otro usuario")
 
         try:
             cursor.execute(
@@ -79,6 +89,39 @@ def eliminar_usuario(user):
     cursor.execute("DELETE FROM usuarios WHERE username=%s", (user,))
     conn.commit()
     conn.close()
+
+    return redirect("/admin/usuarios")
+
+
+@usuarios_bp.route("/usuarios/actualizar_email/<user>", methods=["POST"])
+def actualizar_email_usuario(user):
+    if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
+        return render_template("acceso_denegado.html"), 403
+
+    nuevo_email = (request.form.get("email") or "").strip().lower()
+    if not email_valido(nuevo_email):
+        flash("Correo invalido", "error")
+        return redirect("/admin/usuarios")
+
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT 1 FROM usuarios WHERE LOWER(email) = LOWER(%s) AND LOWER(username) <> LOWER(%s)",
+            (nuevo_email, user),
+        )
+        if cursor.fetchone():
+            flash("Ese correo ya esta asignado a otro usuario", "error")
+            return redirect("/admin/usuarios")
+
+        cursor.execute("UPDATE usuarios SET email=%s WHERE username=%s", (nuevo_email, user))
+        conn.commit()
+        flash("Correo actualizado correctamente", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"No se pudo actualizar el correo: {str(e)}", "error")
+    finally:
+        conn.close()
 
     return redirect("/admin/usuarios")
 
