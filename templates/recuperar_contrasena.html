@@ -24,8 +24,12 @@
             <label class="form-label text-dark fw-semibold">Correo electronico</label>
             <input type="email" name="email" class="form-control" required placeholder="tu@email.com">
         </div>
-        <button class="btn btn-primary w-100 mb-2" type="submit" name="mode" value="email">Enviar codigo por correo</button>
-        <button class="btn btn-outline-secondary w-100" type="submit" name="mode" value="master">Usar codigo maestro (sin correo)</button>
+        <button class="btn btn-primary w-100" type="submit">Enviar codigo por correo</button>
+        {% if envio_detalle or session.get('recovery_send_error') %}
+        <div class="alert alert-secondary mt-3 mb-0" style="font-size: 13px;">
+            Detalle tecnico: {{ envio_detalle or session.get('recovery_send_error') }}
+        </div>
+        {% endif %}
     </form>
 
     <!-- PASO 2: Ingresar código y nueva contraseña -->
@@ -33,10 +37,8 @@
     <form method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="step" value="2">
-        {% if session.get('recovery_mode_master') %}
-        <div class="alert alert-info">Modo codigo maestro activo. Ingresa el codigo maestro configurado en el sistema.</div>
-        {% elif session.get('recovery_email_failed') %}
-        <div class="alert alert-warning">No se pudo enviar correo. Ingresa el codigo maestro configurado en el sistema.</div>
+        {% if session.get('recovery_email_failed') %}
+        <div class="alert alert-warning">No se pudo enviar correo. Verifica la configuracion del proveedor y solicita un nuevo codigo.</div>
         {% if envio_detalle or session.get('recovery_send_error') %}
         <div class="alert alert-secondary" style="font-size: 13px;">
             Detalle tecnico: {{ envio_detalle or session.get('recovery_send_error') }}
@@ -47,8 +49,8 @@
         {% endif %}
         
         <div class="mb-3">
-            <label class="form-label text-dark fw-semibold">Codigo de recuperacion o codigo maestro</label>
-            <input type="text" name="codigo" class="form-control" required placeholder="Ejemplo: 1234 o 123456" maxlength="20">
+            <label class="form-label text-dark fw-semibold">Codigo de recuperacion (6 digitos)</label>
+            <input type="text" name="codigo" class="form-control" required placeholder="Ejemplo: 123456" maxlength="6">
         </div>
         <div class="mb-3">
             <label class="form-label text-dark fw-semibold">Contrasena nueva</label>

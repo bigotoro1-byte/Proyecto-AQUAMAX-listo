@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, session, current_app
 from database.db import conectar, actualizar_contrasena
 from werkzeug.security import check_password_hash, generate_password_hash
+import requests
 import random
 import string
 from datetime import datetime
@@ -34,7 +35,47 @@ def _send_recovery_email(user, email, codigo):
         'Si no solicitaste esto, ignora este mensaje.'
     )
 
-    # Envio por SMTP.
+    brevo_api_key = (os.getenv('BREVO_API_KEY') or '').strip()
+
+    # 1) Intento principal: Brevo API (HTTPS 443).
+    if brevo_api_key:
+        try:
+            sender_email = (os.getenv('BREVO_FROM') or os.getenv('MAIL_USERNAME') or '').strip()
+            if not sender_email:
+                return False, 'BREVO_FROM o MAIL_USERNAME no configurado'
+
+            response = requests.post(
+                'https://api.brevo.com/v3/smtp/email',
+                headers={
+                    'accept': 'application/json',
+                    'api-key': brevo_api_key,
+                    'content-type': 'application/json',
+                },
+                json={
+                    'sender': {'name': 'AQUAMAX', 'email': sender_email},
+                    'to': [{'email': email}],
+                    'subject': subject,
+                    'textContent': body,
+                },
+                timeout=10,
+            )
+            if response.status_code in (200, 201, 202):
+                return True, ''
+
+            detalle = f'Brevo {response.status_code}'
+            try:
+                data = response.json()
+                if isinstance(data, dict) and data.get('message'):
+                    detalle = f"{detalle}: {data.get('message')}"
+            except Exception:
+                pass
+            current_app.logger.error(f'Error Brevo: {detalle}')
+            # Continúa a SMTP fallback.
+        except requests.RequestException as e:
+            current_app.logger.error(f'Error de red Brevo: {str(e)}')
+            # Continúa a SMTP fallback.
+
+    # 2) Fallback: SMTP.
     mail_server = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
     mail_port = int(os.getenv('MAIL_PORT', 587))
     mail_user = os.getenv('MAIL_USERNAME')
@@ -257,13 +298,12 @@ def recuperar_contrasena():
         if step == '1':
             # Paso 1: Usuario solicita código
             user = (request.form.get('user') or '').strip()
-            mode = (request.form.get('mode') or 'email').strip().lower()
             email = (request.form.get('email') or '').strip()
 
             if not user:
                 return render_template('recuperar_contrasena.html', error='Completa el usuario', step=1)
 
-            if mode != 'master' and not email:
+            if not email:
                 return render_template('recuperar_contrasena.html', error='Completa usuario y correo', step=1)
 
             try:
@@ -285,37 +325,27 @@ def recuperar_contrasena():
 
             # Generar código de 6 dígitos
             codigo = ''.join(random.choices(string.digits, k=6))
-            session['recovery_user'] = user
-            session['recovery_code'] = codigo
-            session['recovery_email'] = email
-            session['recovery_code_time'] = datetime.now().timestamp()
-            session['recovery_mode_master'] = (mode == 'master')
-            session.pop('recovery_send_error', None)
-
-            if mode == 'master':
-                session['recovery_attempts'] = 0
-                session['recovery_email_failed'] = False
-                return render_template(
-                    'recuperar_contrasena.html',
-                    success='Modo codigo maestro activado. Ingresa el codigo maestro y tu nueva contraseña.',
-                    step=2
-                )
-
-            # Enviar email con el código (Resend principal, SMTP fallback)
+            # Enviar email con el código (Brevo principal, SMTP fallback)
             sent, envio_detalle = _send_recovery_email(user, email, codigo)
             session['recovery_attempts'] = 0
             if sent:
                 session['recovery_email_failed'] = False
-                session['recovery_mode_master'] = False
+                session['recovery_user'] = user
+                session['recovery_code'] = codigo
+                session['recovery_email'] = email
+                session['recovery_code_time'] = datetime.now().timestamp()
                 return render_template('recuperar_contrasena.html', success='Se envio un codigo a tu correo', step=2)
 
+            session.pop('recovery_user', None)
+            session.pop('recovery_code', None)
+            session.pop('recovery_email', None)
+            session.pop('recovery_code_time', None)
             session['recovery_email_failed'] = True
-            session['recovery_mode_master'] = False
-            session['recovery_send_error'] = (envio_detalle or 'Error no especificado')[:200]
+            session['recovery_send_error'] = (envio_detalle or 'No se pudo enviar correo')[:200]
             return render_template(
                 'recuperar_contrasena.html',
-                error='No se pudo enviar correo. Usa el codigo maestro de recuperacion.',
-                step=2,
+                error='No se pudo enviar correo. Verifica la configuracion de proveedor de correo.',
+                step=1,
                 envio_detalle=session.get('recovery_send_error')
             )
 
@@ -334,14 +364,12 @@ def recuperar_contrasena():
                 session.pop('recovery_code', None)
                 session.pop('recovery_attempts', None)
                 session.pop('recovery_send_error', None)
-                session.pop('recovery_mode_master', None)
                 return render_template('recuperar_contrasena.html', error='El codigo expiro. Solicita uno nuevo.', step=1)
 
             if not codigo or not nueva or not confirmar:
                 return render_template('recuperar_contrasena.html', error='Completa todos los campos', step=2)
 
-            recovery_master = (os.getenv('RECOVERY_CODE') or '').strip()
-            codigo_valido = (codigo == session.get('recovery_code')) or (recovery_master and codigo == recovery_master)
+            codigo_valido = (codigo == session.get('recovery_code'))
 
             if not codigo_valido:
                 session['recovery_attempts'] = session.get('recovery_attempts', 0) + 1
@@ -351,7 +379,6 @@ def recuperar_contrasena():
                     session.pop('recovery_attempts', None)
                     session.pop('recovery_email_failed', None)
                     session.pop('recovery_send_error', None)
-                    session.pop('recovery_mode_master', None)
                     return render_template('recuperar_contrasena.html', error='Demasiados intentos. Solicita un nuevo codigo.', step=1)
                 return render_template('recuperar_contrasena.html', error='Código incorrecto', step=2)
 
@@ -372,7 +399,6 @@ def recuperar_contrasena():
             session.pop('recovery_attempts', None)
             session.pop('recovery_email_failed', None)
             session.pop('recovery_send_error', None)
-            session.pop('recovery_mode_master', None)
 
             return render_template('recuperar_contrasena.html', success='Contraseña actualizada. Ya puedes iniciar sesión', step=1)
 
