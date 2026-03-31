@@ -132,7 +132,7 @@ def usuarios():
             # 🔐 Auditoría: registrar creación de usuario
             registrar_accion_admin(
                 accion='crear_usuario',
-                username=session.get('username', 'desconocido'),
+                username=session.get('user', 'desconocido'),
                 estado='ok',
                 detalle=f'Usuario: {user}, Rol: {rol}, Email: {email}',
                 ip_address=request.remote_addr,
@@ -142,7 +142,7 @@ def usuarios():
             # 🔐 Auditoría: registrar fallo en creación de usuario
             registrar_accion_admin(
                 accion='crear_usuario',
-                username=session.get('username', 'desconocido'),
+                username=session.get('user', 'desconocido'),
                 estado='error',
                 detalle=f'Intento fallido: {str(e)}',
                 ip_address=request.remote_addr,
@@ -171,7 +171,7 @@ def eliminar_usuario(user):
         # 🔐 Auditoría: intento no autorizado
         registrar_accion_admin(
             accion='eliminar_usuario',
-            username=session.get('username', 'desconocido'),
+            username=session.get('user', 'desconocido'),
             estado='error',
             detalle=f'Intento de eliminar usuario protegido: {user}',
             ip_address=request.remote_addr,
@@ -189,7 +189,7 @@ def eliminar_usuario(user):
     # 🔐 Auditoría: eliminación exitosa
     registrar_accion_admin(
         accion='eliminar_usuario',
-        username=session.get('username', 'desconocido'),
+        username=session.get('user', 'desconocido'),
         estado='ok',
         detalle=f'Usuario eliminado: {user}',
         ip_address=request.remote_addr,
@@ -251,7 +251,7 @@ def exportar_db_xlsx():
             registrar_evento_sistema('export_db_xlsx', 'error', f'Fallo exportacion: {str(e)[:220]}', session.get('user'))
             registrar_accion_admin(
                 accion='exportar_db_xlsx',
-                username=session.get('username', 'desconocido'),
+                username=session.get('user', 'desconocido'),
                 estado='error',
                 detalle=str(e)[:220],
                 ip_address=request.remote_addr,
@@ -267,7 +267,7 @@ def exportar_db_xlsx():
         registrar_evento_sistema('export_db_xlsx', 'ok', f'Archivo: {nombre}', session.get('user'))
         registrar_accion_admin(
             accion='exportar_db_xlsx',
-            username=session.get('username', 'desconocido'),
+            username=session.get('user', 'desconocido'),
             estado='ok',
             detalle=f'Archivo: {nombre}',
             ip_address=request.remote_addr,
@@ -343,7 +343,7 @@ def sistema():
                 conn.commit()
                 registrar_accion_admin(
                     accion='limpiar_inventario',
-                    username=session.get('username', 'desconocido'),
+                    username=session.get('user', 'desconocido'),
                     estado='ok',
                     detalle=f'Inventario limpiado. Respaldo: {backup_path}',
                     ip_address=request.remote_addr,
@@ -362,7 +362,7 @@ def sistema():
                 conn.commit()
                 registrar_accion_admin(
                     accion='reiniciar_datos',
-                    username=session.get('username', 'desconocido'),
+                    username=session.get('user', 'desconocido'),
                     estado='ok',
                     detalle=f'Datos del sistema reiniciados. Respaldo: {backup_path}',
                     ip_address=request.remote_addr,
@@ -614,7 +614,7 @@ def limpiar_expirados_manual():
         resultado = limpiar_datos_expirados()
         registrar_accion_admin(
             accion='limpiar_expirados_manual',
-            username=session.get('username', 'desconocido'),
+            username=session.get('user', 'desconocido'),
             estado='ok',
             detalle=f"Códigos: {resultado['deleted_codes']}, Usuarios desbloqueados: {resultado['unblocked_users']}, Emails: {resultado['deleted_emails']}, Sesiones: {resultado['deleted_sessions']}",
             ip_address=request.remote_addr,
@@ -624,7 +624,7 @@ def limpiar_expirados_manual():
     except Exception as e:
         registrar_accion_admin(
             accion='limpiar_expirados_manual',
-            username=session.get('username', 'desconocido'),
+            username=session.get('user', 'desconocido'),
             estado='error',
             detalle=str(e)[:220],
             ip_address=request.remote_addr,
