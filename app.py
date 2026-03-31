@@ -25,6 +25,9 @@ app.secret_key = secret_key
 app.config['WTF_CSRF_ENABLED'] = True
 csrf = CSRFProtect(app)
 
+# Caché de archivos estáticos (CSS, JS, imágenes)
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000
+
 # 📧 Configurar Flask-Mail
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))

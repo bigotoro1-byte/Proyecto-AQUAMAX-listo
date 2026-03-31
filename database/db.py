@@ -1,17 +1,50 @@
 import os
 import psycopg2
 import psycopg2.extras
+from psycopg2.pool import ThreadedConnectionPool
 from dotenv import load_dotenv
 
 load_dotenv()
 
+_pool = None
+
+def _get_pool():
+    global _pool
+    if _pool is None or _pool.closed:
+        database_url = os.getenv('DATABASE_URL')
+        if not database_url:
+            raise RuntimeError('DATABASE_URL no está configurado.')
+        _pool = ThreadedConnectionPool(1, 5, database_url)
+    return _pool
+
+
+class _PooledConn:
+    """Envuelve una conexion psycopg2 para devolverla al pool en conn.close()."""
+    def __init__(self, conn, pool):
+        self._conn = conn
+        self._pool = pool
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+    def close(self):
+        try:
+            self._pool.putconn(self._conn)
+        except Exception:
+            pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+
 def conectar():
-    database_url = os.getenv('DATABASE_URL')
-    if not database_url:
-        raise RuntimeError('DATABASE_URL no está configurado.')
-    conn = psycopg2.connect(database_url)
+    pool = _get_pool()
+    conn = pool.getconn()
     conn.autocommit = False
-    return conn
+    return _PooledConn(conn, pool)
 
 def crear_tablas():
     conn = conectar()
