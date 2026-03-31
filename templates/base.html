@@ -39,7 +39,8 @@ body {
     background: #0f172a;
     color: white;
     padding: 20px;
-    transition: 0.3s;
+    transition: width 0.3s, padding 0.3s;
+    position: relative;
 }
 
 .sidebar.collapsed {
@@ -72,6 +73,7 @@ body {
     border-radius: 6px;
     transition: 0.2s;
     width: auto;
+    z-index: 2;
 }
 
 .sidebar-toggle:hover {
@@ -299,31 +301,27 @@ body.loading {
     {% if session.get("user") %}
     <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
-            <button class="sidebar-toggle" onclick="toggleSidebar()" title="Ocultar menú">✕</button>
+        <button class="sidebar-toggle" type="button" onclick="toggleSidebar()" title="Ocultar menú">✕</button>
         <h3>💧 AQUAMAX</h3>
 
-        <a href="/dashboard">📊 Dashboard</a>
-        <a href="/inventario">📦 Inventario</a>
-        <a href="/reporte">📄 Reporte</a>
+        <a href="/dashboard" title="Dashboard"><span>📊 Dashboard</span></a>
+        <a href="/inventario" title="Inventario"><span>📦 Inventario</span></a>
+        <a href="/reporte" title="Reporte"><span>📄 Reporte</span></a>
 
-    <a href="/dashboard" title="Dashboard"><span>📊 Dashboard</span></a>
-    <a href="/inventario" title="Inventario"><span>📦 Inventario</span></a>
-    <a href="/reporte" title="Reporte"><span>📄 Reporte</span></a>
+        {% if session.get("rol") in ["admin", "superadmin"] %}
+        <a href="/productos" title="Productos"><span>📋 Productos</span></a>
+        <a href="/admin/usuarios" title="Usuarios"><span>👤 Usuarios</span></a>
+        <a href="/admin/accesos" title="Ingresos"><span>🕒 Ingresos</span></a>
+        <a href="/admin/ubicaciones" title="Ubicaciones"><span>📍 Ubicaciones</span></a>
+        <a href="/admin/ajustes-stock" title="Ajustes stock"><span>⚙️ Ajustes stock</span></a>
+        {% endif %}
 
-    {% if session.get("rol") in ["admin", "superadmin"] %}
-    <a href="/productos" title="Productos"><span>📋 Productos</span></a>
-    <a href="/admin/usuarios" title="Usuarios"><span>👤 Usuarios</span></a>
-    <a href="/admin/accesos" title="Ingresos"><span>🕒 Ingresos</span></a>
-    <a href="/admin/ubicaciones" title="Ubicaciones"><span>📍 Ubicaciones</span></a>
-    <a href="/admin/ajustes-stock" title="Ajustes stock"><span>⚙️ Ajustes stock</span></a>
-    {% endif %}
+        {% if session.get("rol") == "superadmin" %}
+        <a href="/admin/sistema" title="Sistema"><span>🛡️ Sistema</span></a>
+        {% endif %}
 
-    {% if session.get("rol") == "superadmin" %}
-    <a href="/admin/sistema" title="Sistema"><span>🛡️ Sistema</span></a>
-    {% endif %}
-
-    <a href="/cambiar_contrasena" title="Cambiar clave"><span>🔑 Cambiar clave</span></a>
-    <a href="/logout" title="Salir"><span>🚪 Salir</span></a>
+        <a href="/cambiar_contrasena" title="Cambiar clave"><span>🔑 Cambiar clave</span></a>
+        <a href="/logout" title="Salir"><span>🚪 Salir</span></a>
         <div class="session-box" id="sessionBox"
              data-login-ts="{{ session_login_ts or '' }}"
              data-last-activity-ts="{{ session_last_activity_ts or '' }}"
@@ -378,40 +376,33 @@ function toggleMenu() {
         const sidebar = document.getElementById("sidebar");
         if (sidebar) {
             sidebar.classList.toggle("collapsed");
-            const isCollapsed = sidebar.classList.contains("collapsed");
-            localStorage.setItem("sidebarCollapsed", isCollapsed);
-        }
-    }
-
-    // Restaurar estado del sidebar al cargar
-    document.addEventListener("DOMContentLoaded", function () {
-        const sidebar = document.getElementById("sidebar");
-        if (sidebar) {
-            const isCollapsed = localStorage.getItem("sidebarCollapsed") === "true";
-            if (isCollapsed) {
-                sidebar.classList.add("collapsed");
-            }
-        }
-    });
     }
 }
-
+            const isCollapsed = sidebar.classList.contains("collapsed");
+function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar) {
+        sidebar.classList.toggle("collapsed");
+        const isCollapsed = sidebar.classList.contains("collapsed");
+        localStorage.setItem("sidebarCollapsed", isCollapsed ? "true" : "false");
+        if (sidebar) {
+}
+            const isCollapsed = localStorage.getItem("sidebarCollapsed") === "true";
 document.addEventListener("DOMContentLoaded", function () {
     const sidebar = document.getElementById("sidebar");
     if (!sidebar) return;
+
+    const isCollapsed = localStorage.getItem("sidebarCollapsed") === "true";
+    if (isCollapsed) {
+        sidebar.classList.add("collapsed");
+    }
 
     const sidebarLinks = sidebar.querySelectorAll("a");
     sidebarLinks.forEach(function (link) {
         link.addEventListener("click", function () {
             if (window.matchMedia("(max-width: 768px)").matches) {
                 sidebar.classList.remove("active");
-            }
-        });
-    });
-});
-
-(function () {
-    const overlay = document.getElementById("appLoading");
+document.addEventListener("DOMContentLoaded", function () {
     const textEl = document.getElementById("appLoadingText");
     if (!overlay || !textEl) return;
 
