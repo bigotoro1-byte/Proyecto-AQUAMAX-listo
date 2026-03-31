@@ -220,6 +220,20 @@ button {
     border-radius: 10px;
 }
 
+.table-sticky-wrap {
+    max-height: min(62vh, 520px);
+    overflow: auto;
+}
+
+.table-sticky thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #212529;
+    color: #f8fafc;
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+}
+
 /* =========================
    TABLA EMPRESARIAL COMPACTA
 ========================= */
@@ -309,6 +323,10 @@ body.loading {
 
     .card {
         padding: 14px;
+    }
+
+    .table-sticky-wrap {
+        max-height: min(58vh, 460px);
     }
 }
 
