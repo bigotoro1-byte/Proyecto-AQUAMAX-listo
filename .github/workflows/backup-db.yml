@@ -39,7 +39,7 @@ jobs:
           gzip "$FILE"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: aquamax-db-backup-${{ github.run_id }}
           path: backups/*.sql.gz
