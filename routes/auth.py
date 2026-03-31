@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, session, current_app
-from database.db import conectar, actualizar_contrasena, registrar_acceso_login
+from database.db import conectar, actualizar_contrasena, registrar_acceso_login, cerrar_acceso_login
 from werkzeug.security import check_password_hash, generate_password_hash
 import requests
 import random
@@ -218,7 +218,8 @@ def login():
             )
             user_agent = request.headers.get("User-Agent", "")[:255]
             try:
-                registrar_acceso_login(usuario[0], usuario[2], ip, user_agent)
+                acceso_id = registrar_acceso_login(usuario[0], usuario[2], ip, user_agent)
+                session["acceso_login_id"] = acceso_id
             except Exception as e:
                 current_app.logger.error(f"No se pudo registrar acceso de login: {str(e)}")
 
@@ -260,6 +261,12 @@ def login():
 
 @auth_bp.route("/logout")
 def logout():
+    acceso_id = session.get("acceso_login_id")
+    if acceso_id:
+        try:
+            cerrar_acceso_login(acceso_id)
+        except Exception as e:
+            current_app.logger.error(f"No se pudo cerrar acceso de login: {str(e)}")
     session.clear()
     return redirect("/login")
 

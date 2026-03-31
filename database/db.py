@@ -140,7 +140,9 @@ def crear_tablas():
         rol TEXT,
         ip TEXT,
         user_agent TEXT,
-        fecha TIMESTAMP NOT NULL DEFAULT NOW()
+        fecha TIMESTAMP NOT NULL DEFAULT NOW(),
+        fecha_salida TIMESTAMP,
+        duracion_segundos INTEGER
     )
     """)
 
@@ -184,10 +186,14 @@ def actualizar_tabla():
                 rol TEXT,
                 ip TEXT,
                 user_agent TEXT,
-                fecha TIMESTAMP NOT NULL DEFAULT NOW()
+                fecha TIMESTAMP NOT NULL DEFAULT NOW(),
+                fecha_salida TIMESTAMP,
+                duracion_segundos INTEGER
             )
             """
         )
+        cursor.execute("ALTER TABLE accesos_login ADD COLUMN IF NOT EXISTS fecha_salida TIMESTAMP")
+        cursor.execute("ALTER TABLE accesos_login ADD COLUMN IF NOT EXISTS duracion_segundos INTEGER")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_accesos_login_fecha ON accesos_login(fecha DESC)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_accesos_login_username ON accesos_login(username)")
         conn.commit()
@@ -512,8 +518,34 @@ def registrar_acceso_login(username, rol=None, ip=None, user_agent=None):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO accesos_login (username, rol, ip, user_agent) VALUES (%s, %s, %s, %s)",
+            "INSERT INTO accesos_login (username, rol, ip, user_agent) VALUES (%s, %s, %s, %s) RETURNING id",
             (username, rol, ip, user_agent),
+        )
+        acceso_id = cursor.fetchone()[0]
+        conn.commit()
+        return acceso_id
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def cerrar_acceso_login(acceso_id):
+    if not acceso_id:
+        return
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            UPDATE accesos_login
+            SET
+                fecha_salida = NOW(),
+                duracion_segundos = GREATEST(0, EXTRACT(EPOCH FROM (NOW() - fecha))::int)
+            WHERE id = %s AND fecha_salida IS NULL
+            """,
+            (acceso_id,),
         )
         conn.commit()
     except Exception as e:
@@ -527,7 +559,15 @@ def get_accesos_login(limit=100, username=None, fecha_desde=None, fecha_hasta=No
     conn = conectar()
     cursor = conn.cursor()
     query = """
-        SELECT username, rol, ip, user_agent, fecha
+        SELECT
+            username,
+            rol,
+            ip,
+            user_agent,
+            fecha,
+            fecha_salida,
+            COALESCE(duracion_segundos, GREATEST(0, EXTRACT(EPOCH FROM (NOW() - fecha))::int)) AS duracion_segundos,
+            CASE WHEN fecha_salida IS NULL THEN 'Activa' ELSE 'Cerrada' END AS estado
         FROM accesos_login
         WHERE 1=1
     """

@@ -1,7 +1,7 @@
 from flask import Flask, session, redirect, flash
 from flask_wtf.csrf import CSRFProtect
 from flask_mail import Mail
-from database.db import crear_tablas, actualizar_tabla, insert_usuario, get_usuario
+from database.db import crear_tablas, actualizar_tabla, insert_usuario, get_usuario, cerrar_acceso_login
 from werkzeug.security import generate_password_hash
 import os
 import time
@@ -59,6 +59,12 @@ def controlar_sesion_por_inactividad():
     timeout_seconds = int(app.config.get('SESSION_TIMEOUT_SECONDS', 1800))
 
     if last_activity and (now_ts - int(last_activity)) > timeout_seconds:
+        acceso_id = session.get('acceso_login_id')
+        if acceso_id:
+            try:
+                cerrar_acceso_login(acceso_id)
+            except Exception:
+                pass
         session.clear()
         flash('Tu sesion caduco por inactividad. Inicia sesion nuevamente.', 'error')
         return redirect('/login')

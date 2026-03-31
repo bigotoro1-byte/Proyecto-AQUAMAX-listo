@@ -33,9 +33,11 @@
                     <tr>
                         <th>Usuario</th>
                         <th>Rol</th>
+                        <th>Ingreso</th>
+                        <th>Salida</th>
+                        <th>Duracion</th>
+                        <th>Estado</th>
                         <th>IP</th>
-                        <th>Navegador / Dispositivo</th>
-                        <th>Fecha</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -44,14 +46,28 @@
                         <tr>
                             <td class="fw-semibold">{{ a[0] }}</td>
                             <td>{{ a[1] or '-' }}</td>
-                            <td>{{ a[2] or '-' }}</td>
-                            <td style="max-width: 420px; word-break: break-word;">{{ a[3] or '-' }}</td>
                             <td>{{ a[4] }}</td>
+                            <td>{{ a[5] or '-' }}</td>
+                            <td>
+                                {% set total = a[6] or 0 %}
+                                {% set h = (total // 3600)|int %}
+                                {% set m = ((total % 3600) // 60)|int %}
+                                {% set s = (total % 60)|int %}
+                                {{ "%02d:%02d:%02d"|format(h, m, s) }}
+                            </td>
+                            <td>
+                                {% if a[7] == 'Activa' %}
+                                <span class="badge bg-success">Activa</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Cerrada</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ a[2] or '-' }}</td>
                         </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="5" class="text-center text-muted">No hay ingresos registrados.</td>
+                            <td colspan="7" class="text-center text-muted">No hay ingresos registrados.</td>
                         </tr>
                     {% endif %}
                 </tbody>
