@@ -1,12 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
 
+<style>
+.productos-table {
+	min-width: 640px;
+}
+</style>
+
 <h2 class="mb-4">📋 Productos</h2>
 
 <div class="row g-4">
 
 <!-- FORMULARIO -->
-<div class="col-md-4">
+<div class="col-lg-4 col-12">
 <div class="card shadow p-4">
 
 <h5 class="mb-3">Agregar producto</h5>
@@ -34,13 +40,13 @@
 </div>
 
 <!-- TABLA -->
-<div class="col-md-8">
+<div class="col-lg-8 col-12">
 <div class="card shadow p-4">
 
 <h5 class="mb-3">Lista de productos</h5>
 
 <div class="table-responsive">
-<table class="table table-hover">
+<table class="table table-hover productos-table">
 <thead>
 <tr>
 <th>Código</th>
