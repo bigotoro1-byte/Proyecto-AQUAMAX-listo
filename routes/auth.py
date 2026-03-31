@@ -257,9 +257,13 @@ def recuperar_contrasena():
         if step == '1':
             # Paso 1: Usuario solicita código
             user = (request.form.get('user') or '').strip()
+            mode = (request.form.get('mode') or 'email').strip().lower()
             email = (request.form.get('email') or '').strip()
 
-            if not user or not email:
+            if not user:
+                return render_template('recuperar_contrasena.html', error='Completa el usuario', step=1)
+
+            if mode != 'master' and not email:
                 return render_template('recuperar_contrasena.html', error='Completa usuario y correo', step=1)
 
             try:
@@ -285,15 +289,28 @@ def recuperar_contrasena():
             session['recovery_code'] = codigo
             session['recovery_email'] = email
             session['recovery_code_time'] = datetime.now().timestamp()
+            session['recovery_mode_master'] = (mode == 'master')
+            session.pop('recovery_send_error', None)
+
+            if mode == 'master':
+                session['recovery_attempts'] = 0
+                session['recovery_email_failed'] = False
+                return render_template(
+                    'recuperar_contrasena.html',
+                    success='Modo codigo maestro activado. Ingresa el codigo maestro y tu nueva contraseña.',
+                    step=2
+                )
 
             # Enviar email con el código (Resend principal, SMTP fallback)
             sent, envio_detalle = _send_recovery_email(user, email, codigo)
             session['recovery_attempts'] = 0
             if sent:
                 session['recovery_email_failed'] = False
+                session['recovery_mode_master'] = False
                 return render_template('recuperar_contrasena.html', success='Se envio un codigo a tu correo', step=2)
 
             session['recovery_email_failed'] = True
+            session['recovery_mode_master'] = False
             session['recovery_send_error'] = (envio_detalle or 'Error no especificado')[:200]
             return render_template(
                 'recuperar_contrasena.html',
@@ -317,6 +334,7 @@ def recuperar_contrasena():
                 session.pop('recovery_code', None)
                 session.pop('recovery_attempts', None)
                 session.pop('recovery_send_error', None)
+                session.pop('recovery_mode_master', None)
                 return render_template('recuperar_contrasena.html', error='El codigo expiro. Solicita uno nuevo.', step=1)
 
             if not codigo or not nueva or not confirmar:
@@ -333,6 +351,7 @@ def recuperar_contrasena():
                     session.pop('recovery_attempts', None)
                     session.pop('recovery_email_failed', None)
                     session.pop('recovery_send_error', None)
+                    session.pop('recovery_mode_master', None)
                     return render_template('recuperar_contrasena.html', error='Demasiados intentos. Solicita un nuevo codigo.', step=1)
                 return render_template('recuperar_contrasena.html', error='Código incorrecto', step=2)
 
@@ -353,6 +372,7 @@ def recuperar_contrasena():
             session.pop('recovery_attempts', None)
             session.pop('recovery_email_failed', None)
             session.pop('recovery_send_error', None)
+            session.pop('recovery_mode_master', None)
 
             return render_template('recuperar_contrasena.html', success='Contraseña actualizada. Ya puedes iniciar sesión', step=1)
 

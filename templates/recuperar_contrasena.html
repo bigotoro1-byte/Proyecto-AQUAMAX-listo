@@ -24,7 +24,8 @@
             <label class="form-label text-dark fw-semibold">Correo electronico</label>
             <input type="email" name="email" class="form-control" required placeholder="tu@email.com">
         </div>
-        <button class="btn btn-primary w-100">Enviar código por correo</button>
+        <button class="btn btn-primary w-100 mb-2" type="submit" name="mode" value="email">Enviar codigo por correo</button>
+        <button class="btn btn-outline-secondary w-100" type="submit" name="mode" value="master">Usar codigo maestro (sin correo)</button>
     </form>
 
     <!-- PASO 2: Ingresar código y nueva contraseña -->
@@ -32,7 +33,9 @@
     <form method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="step" value="2">
-        {% if session.get('recovery_email_failed') %}
+        {% if session.get('recovery_mode_master') %}
+        <div class="alert alert-info">Modo codigo maestro activo. Ingresa el codigo maestro configurado en el sistema.</div>
+        {% elif session.get('recovery_email_failed') %}
         <div class="alert alert-warning">No se pudo enviar correo. Ingresa el codigo maestro configurado en el sistema.</div>
         {% if envio_detalle or session.get('recovery_send_error') %}
         <div class="alert alert-secondary" style="font-size: 13px;">
