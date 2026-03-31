@@ -296,20 +296,16 @@ def recuperar_contrasena():
         step = request.form.get('step', '1')
 
         if step == '1':
-            # Paso 1: Usuario solicita código
+            # Paso 1: Usuario solicita código (se envia solo al correo registrado)
             user = (request.form.get('user') or '').strip()
-            email = (request.form.get('email') or '').strip()
 
             if not user:
                 return render_template('recuperar_contrasena.html', error='Completa el usuario', step=1)
 
-            if not email:
-                return render_template('recuperar_contrasena.html', error='Completa usuario y correo', step=1)
-
             try:
                 conn = conectar()
                 cursor = conn.cursor()
-                cursor.execute('SELECT * FROM usuarios WHERE LOWER(username) = LOWER(%s)', (user,))
+                cursor.execute('SELECT username, email FROM usuarios WHERE LOWER(username) = LOWER(%s)', (user,))
                 usuario = cursor.fetchone()
                 conn.close()
             except Exception as e:
@@ -323,18 +319,22 @@ def recuperar_contrasena():
             if not usuario:
                 return render_template('recuperar_contrasena.html', error='Usuario no existe', step=1)
 
+            email_registrado = (usuario[1] or '').strip()
+            if not email_registrado:
+                return render_template('recuperar_contrasena.html', error='Este usuario no tiene correo de recuperacion registrado. Contacta al administrador.', step=1)
+
             # Generar código de 6 dígitos
             codigo = ''.join(random.choices(string.digits, k=6))
             # Enviar email con el código (Brevo principal, SMTP fallback)
-            sent, envio_detalle = _send_recovery_email(user, email, codigo)
+            sent, envio_detalle = _send_recovery_email(user, email_registrado, codigo)
             session['recovery_attempts'] = 0
             if sent:
                 session['recovery_email_failed'] = False
-                session['recovery_user'] = user
+                session['recovery_user'] = usuario[0]
                 session['recovery_code'] = codigo
-                session['recovery_email'] = email
+                session['recovery_email'] = email_registrado
                 session['recovery_code_time'] = datetime.now().timestamp()
-                return render_template('recuperar_contrasena.html', success='Se envio un codigo a tu correo', step=2)
+                return render_template('recuperar_contrasena.html', success='Se envio un codigo al correo registrado del usuario', step=2)
 
             session.pop('recovery_user', None)
             session.pop('recovery_code', None)

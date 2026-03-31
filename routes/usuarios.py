@@ -30,9 +30,13 @@ def usuarios():
         user = request.form.get("usuario")
         password = request.form.get("password")
         rol = request.form.get("rol")
+        email = (request.form.get("email") or "").strip().lower()
 
-        if not user or not password or not rol:
+        if not user or not password or not rol or not email:
             return render_template("usuarios.html", error="Completa todos los campos")
+
+        if "@" not in email or "." not in email.split("@")[-1]:
+            return render_template("usuarios.html", error="Ingresa un correo valido")
 
         if not password_es_fuerte(password):
             return render_template("usuarios.html", error="La contraseña debe tener al menos 8 caracteres, letras y numeros")
@@ -42,12 +46,12 @@ def usuarios():
 
         try:
             cursor.execute(
-                "INSERT INTO usuarios (username, password, rol) VALUES (%s, %s, %s)",
-                (user, generate_password_hash(password), rol)
+                "INSERT INTO usuarios (username, password, rol, email) VALUES (%s, %s, %s, %s)",
+                (user, generate_password_hash(password), rol, email)
             )
             conn.commit()
         except:
-            return render_template("usuarios.html", error="Usuario ya existe")
+            return render_template("usuarios.html", error="Usuario o correo ya existe")
 
     # 👉 LISTAR
     cursor.execute("SELECT * FROM usuarios")

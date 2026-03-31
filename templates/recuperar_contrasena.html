@@ -16,13 +16,10 @@
     <form method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="step" value="1">
+        <div class="alert alert-info">El codigo se enviara solo al correo de recuperacion registrado para ese usuario.</div>
         <div class="mb-3">
             <label class="form-label text-dark fw-semibold">Usuario</label>
             <input type="text" name="user" class="form-control" required placeholder="Ingresa tu usuario">
-        </div>
-        <div class="mb-3">
-            <label class="form-label text-dark fw-semibold">Correo electronico</label>
-            <input type="email" name="email" class="form-control" required placeholder="tu@email.com">
         </div>
         <button class="btn btn-primary w-100" type="submit">Enviar codigo por correo</button>
         {% if envio_detalle or session.get('recovery_send_error') %}

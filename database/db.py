@@ -66,7 +66,8 @@ def crear_tablas():
     CREATE TABLE IF NOT EXISTS usuarios (
         username TEXT PRIMARY KEY,
         password TEXT NOT NULL,
-        rol TEXT NOT NULL
+        rol TEXT NOT NULL,
+        email TEXT
     )
     """)
 
@@ -156,17 +157,33 @@ def crear_tablas():
     conn.close()
 
 def actualizar_tabla():
-    # Migraciones si es necesario
-    pass
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        # Migracion: agregar email de recuperacion por usuario
+        cursor.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS email TEXT")
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # Funciones seguras con prepared statements
-def insert_usuario(username, password, rol):
+def insert_usuario(username, password, rol, email=None):
     conn = conectar()
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO usuarios (username, password, rol) VALUES (%s, %s, %s) ON CONFLICT (username) DO UPDATE SET password=EXCLUDED.password, rol=EXCLUDED.rol",
-            (username, password, rol)
+            """
+            INSERT INTO usuarios (username, password, rol, email)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (username) DO UPDATE SET
+                password = EXCLUDED.password,
+                rol = EXCLUDED.rol,
+                email = COALESCE(EXCLUDED.email, usuarios.email)
+            """,
+            (username, password, rol, email)
         )
         conn.commit()
     except Exception as e:
