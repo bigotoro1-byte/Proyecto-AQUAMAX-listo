@@ -1,20 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2>🚨 Alertas de Uso</h2>
-
-<table class="table table-dark">
-<tr>
-<th>Registro</th>
-</tr>
-
-{% for d in datos %}
-<tr>
-<td style="color:#f87171; font-weight:bold;">
-    ⚠️ {{ d.strip() }}
-</td>
-</tr>
-{% endfor %}
-</table>
+<div class="container mt-4">
+    <h2 class="mb-3">🚨 Alertas de Uso</h2>
+    <div class="card p-3 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-dark align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Registro</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in datos %}
+                    <tr>
+                        <td style="color:#f87171; font-weight:bold;">⚠️ {{ d.strip() }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
 {% endblock %}

@@ -23,6 +23,10 @@ body {
     background-size: cover;
 }
 
+body.menu-open {
+    overflow: hidden;
+}
+
 /* =========================
    LAYOUT
 ========================= */
@@ -37,7 +41,7 @@ body {
     position: fixed;
     top: 0;
     left: 0;
-    width: 240px;
+    width: min(86vw, 320px);
     height: 100vh;
     background: #0f172a;
     color: white;
@@ -185,21 +189,12 @@ button {
    RESPONSIVE
 ========================= */
 @media (max-width: 768px) {
-
-    .sidebar {
-        position: fixed;
-        left: -240px;
-        top: 0;
-        height: 100%;
-        z-index: 1000;
-    }
-
-    .sidebar.active {
-        left: 0;
-    }
-
     .menu-toggle {
         margin-bottom: 12px;
+    }
+
+    .content {
+        padding: 14px;
     }
 }
 
@@ -219,6 +214,10 @@ button {
 
 .menu-toggle:hover {
     background: #1e293b;
+}
+
+.table-responsive {
+    border-radius: 10px;
 }
 
 /* =========================
@@ -306,6 +305,10 @@ body.loading {
 
     .content-panel {
         padding-top: 12px;
+    }
+
+    .card {
+        padding: 14px;
     }
 }
 

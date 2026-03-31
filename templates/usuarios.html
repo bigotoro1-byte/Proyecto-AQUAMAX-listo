@@ -13,17 +13,17 @@
     <div class="card p-3 mb-4 shadow">
         <form method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="row">
-                <div class="col">
+            <div class="row g-2">
+                <div class="col-lg-3 col-md-6 col-12">
                     <input type="text" name="usuario" class="form-control" placeholder="Usuario">
                 </div>
-                <div class="col">
+                <div class="col-lg-3 col-md-6 col-12">
                     <input type="password" name="password" class="form-control" placeholder="Contraseña">
                 </div>
-                <div class="col">
+                <div class="col-lg-3 col-md-6 col-12">
                     <input type="email" name="email" class="form-control" placeholder="Correo recuperación">
                 </div>
-                <div class="col">
+                <div class="col-lg-2 col-md-6 col-12">
                     <select name="rol" class="form-control">
                         <option value="">Rol</option>
                         <option value="admin">Admin</option>
@@ -33,7 +33,7 @@
                         {% endif %}
                     </select>
                 </div>
-                <div class="col">
+                <div class="col-lg-1 col-md-12 col-12">
                     <button class="btn btn-primary w-100">Crear</button>
                 </div>
             </div>
@@ -42,7 +42,8 @@
 
     <!-- LISTA -->
     <div class="card p-3 shadow">
-        <table class="table">
+        <div class="table-responsive">
+        <table class="table align-middle">
             <thead>
                 <tr>
                     <th>Usuario</th>
@@ -59,7 +60,7 @@
                     <td>{{ u[3] if u|length > 3 else '' }}</td>
                     <td>{{ u[2] }}</td>
                     <td>
-                        <form method="post" action="/admin/usuarios/actualizar_email/{{ u[0] }}" class="d-flex gap-2">
+                        <form method="post" action="/admin/usuarios/actualizar_email/{{ u[0] }}" class="d-flex flex-column flex-md-row gap-2">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="email" name="email" class="form-control form-control-sm" placeholder="nuevo@email.com" value="{{ u[3] if u|length > 3 else '' }}" required>
                             <button class="btn btn-outline-primary btn-sm" type="submit">Guardar</button>
@@ -77,6 +78,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 

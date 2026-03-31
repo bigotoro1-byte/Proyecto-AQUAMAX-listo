@@ -1,11 +1,64 @@
 {% extends "base.html" %}
 {% block content %}
 
+<style>
+.kpi-slider {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 6px;
+}
+
+.kpi-slider::-webkit-scrollbar {
+    height: 6px;
+}
+
+.kpi-slider::-webkit-scrollbar-thumb {
+    background: rgba(15, 23, 42, 0.35);
+    border-radius: 8px;
+}
+
+.kpi-slide {
+    min-width: 82%;
+    scroll-snap-align: start;
+}
+
+@media (min-width: 768px) {
+    .kpi-slider-wrap {
+        display: none;
+    }
+}
+</style>
+
 <h2 class="mb-4">📊 Dashboard</h2>
 <p class="text-muted mb-4">Usuario: {{ session.get('user', 'Invitado') }}</p>
 
 <!-- 🔢 CARDS -->
-<div class="row g-4 mb-4">
+<div class="kpi-slider-wrap mb-4">
+    <div class="kpi-slider">
+        <div class="kpi-slide">
+            <div class="card shadow p-4 text-center">
+                <h6>Total Inventario</h6>
+                <h2 class="text-primary">{{total}}</h2>
+            </div>
+        </div>
+        <div class="kpi-slide">
+            <div class="card shadow p-4 text-center">
+                <h6>Productos</h6>
+                <h2 class="text-success">{{total_productos}}</h2>
+            </div>
+        </div>
+        <div class="kpi-slide">
+            <div class="card shadow p-4 text-center">
+                <h6>Alertas</h6>
+                <h2 class="text-danger">{{stock_bajo}}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4 d-none d-md-flex">
 
 <div class="col-md-4">
 <div class="card shadow p-4 text-center">
