@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, session, current_app
 from database.db import conectar, actualizar_contrasena
 from werkzeug.security import check_password_hash, generate_password_hash
+import requests
 import random
 import string
 from datetime import datetime
@@ -23,6 +24,72 @@ def password_es_fuerte(password):
     has_letter = any(c.isalpha() for c in password)
     has_digit = any(c.isdigit() for c in password)
     return has_letter and has_digit
+
+
+def _send_recovery_email(user, email, codigo):
+    subject = 'Codigo de recuperacion AQUAMAX'
+    body = (
+        f'Hola {user},\n\n'
+        f'Tu codigo de recuperacion es: {codigo}\n\n'
+        'Este codigo expira en 15 minutos.\n\n'
+        'Si no solicitaste esto, ignora este mensaje.'
+    )
+
+    resend_api_key = (os.getenv('RESEND_API_KEY') or '').strip()
+    mail_from = os.getenv('MAIL_FROM', 'onboarding@resend.dev')
+
+    # 1) Intento principal: Resend API (HTTPS/443).
+    if resend_api_key:
+        try:
+            response = requests.post(
+                'https://api.resend.com/emails',
+                headers={
+                    'Authorization': f'Bearer {resend_api_key}',
+                    'Content-Type': 'application/json',
+                },
+                json={
+                    'from': mail_from,
+                    'to': [email],
+                    'subject': subject,
+                    'text': body,
+                },
+                timeout=8,
+            )
+            if response.status_code in (200, 201, 202):
+                return True
+            current_app.logger.error(
+                f'Resend fallo ({response.status_code}): {response.text[:300]}'
+            )
+        except requests.RequestException as e:
+            current_app.logger.error(f'Error Resend: {str(e)}')
+
+    # 2) Fallback: SMTP clásico.
+    mail_server = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+    mail_port = int(os.getenv('MAIL_PORT', 587))
+    mail_user = os.getenv('MAIL_USERNAME')
+    mail_pass = os.getenv('MAIL_PASSWORD')
+
+    if not mail_user or not mail_pass:
+        return False
+
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = mail_from
+        msg['To'] = email
+        msg_text = MIMEText(body, 'plain', 'utf-8')
+        msg.attach(msg_text)
+
+        with smtplib.SMTP(mail_server, mail_port, timeout=8) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(mail_user, mail_pass)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        current_app.logger.error(f'Error SMTP fallback: {str(e)}')
+        return False
 
 
 def _password_matches(expected_value, provided_password):
@@ -241,47 +308,15 @@ def recuperar_contrasena():
             session['recovery_email'] = email
             session['recovery_code_time'] = datetime.now().timestamp()
 
-            # Enviar email con el código
-            try:
-                from dotenv import load_dotenv
-                load_dotenv()
-                
-                mail_server = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
-                mail_port = int(os.getenv('MAIL_PORT', 587))
-                mail_user = os.getenv('MAIL_USERNAME')
-                mail_pass = os.getenv('MAIL_PASSWORD')
-                mail_from = os.getenv('MAIL_FROM', 'aquamax@tuempresa.com')
-                
-                # Crear mensaje con UTF-8
-                msg = MIMEMultipart('alternative')
-                msg['Subject'] = 'Codigo de recuperacion AQUAMAX'
-                msg['From'] = mail_from
-                msg['To'] = email
-                
-                cuerpo = f'Hola {user},\n\nTu codigo de recuperacion es: {codigo}\n\nEste codigo expira en 15 minutos.\n\nSi no solicitaste esto, ignora este mensaje.'
-                msg_text = MIMEText(cuerpo, 'plain', 'utf-8')
-                msg.attach(msg_text)
-                
-                # Enviar por SMTP con timeout corto para evitar que el worker se cuelgue.
-                if not mail_user or not mail_pass:
-                    raise RuntimeError('MAIL_USERNAME o MAIL_PASSWORD no configurados')
-
-                with smtplib.SMTP(mail_server, mail_port, timeout=8) as server:
-                    server.ehlo()
-                    server.starttls()
-                    server.ehlo()
-                    server.login(mail_user, mail_pass)
-                    server.send_message(msg)
-                
-                session['recovery_attempts'] = 0
+            # Enviar email con el código (Resend principal, SMTP fallback)
+            sent = _send_recovery_email(user, email, codigo)
+            session['recovery_attempts'] = 0
+            if sent:
                 session['recovery_email_failed'] = False
                 return render_template('recuperar_contrasena.html', success='Se envio un codigo a tu correo', step=2)
-            except Exception as e:
-                current_app.logger.error(f'Error enviando email: {str(e)}')
-                # Fallback para no bloquear recuperación cuando SMTP falla.
-                session['recovery_attempts'] = 0
-                session['recovery_email_failed'] = True
-                return render_template('recuperar_contrasena.html', error='No se pudo enviar correo. Usa el codigo maestro de recuperacion.', step=2)
+
+            session['recovery_email_failed'] = True
+            return render_template('recuperar_contrasena.html', error='No se pudo enviar correo. Usa el codigo maestro de recuperacion.', step=2)
 
         elif step == '2':
             # Paso 2: Usuario ingresa código y nueva contraseña
