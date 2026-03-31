@@ -36,6 +36,11 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(seconds=app.config['SESSION
 app.config['WTF_CSRF_ENABLED'] = True
 csrf = CSRFProtect(app)
 
+# 🔒 Hardening de cookies HTTP
+app.config['SESSION_COOKIE_SECURE'] = not is_development  # HTTPS only (no en desarrollo)
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # No accesible desde JavaScript (previene XSS)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Previene ataques CSRF
+
 # Caché de archivos estáticos (CSS, JS, imágenes)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000
 

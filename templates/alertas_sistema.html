@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+    <h2 class="mb-3">🚨 Alertas del Sistema</h2>
+    <p class="text-muted">Condiciones críticas detectadas que requieren atención.</p>
+
+    <!-- ESTADO GENERAL -->
+    <div class="row mb-4">
+        <div class="col-12">
+            {% if hay_alertas %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <strong>⚠️ Alertas Detectadas</strong> — Se han detectado {{ condiciones_alerta|length }} condición(es) que requieren atención.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% else %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <strong>✅ Sistema Normal</strong> — No hay alertas activas. El sistema está operando correctamente.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ALERTAS DETECTADAS -->
+    {% if hay_alertas %}
+    <div class="row g-3 mb-4">
+        {% if 'login_fallidos' in condiciones_alerta %}
+        <div class="col-md-6">
+            <div class="card border-danger p-3 h-100">
+                <h5 class="card-title text-danger">🔴 Múltiples Intentos Fallidos</h5>
+                <p class="card-text">
+                    <strong>{{ condiciones_alerta['login_fallidos']['count'] }}</strong> usuario(s) con intentos fallidos en últimas 2 horas.
+                </p>
+                <small class="text-muted">{{ condiciones_alerta['login_fallidos']['descripcion'] }}</small>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if 'usuarios_bloqueados' in condiciones_alerta %}
+        <div class="col-md-6">
+            <div class="card border-warning p-3 h-100">
+                <h5 class="card-title text-warning">🟡 Usuarios Bloqueados</h5>
+                <p class="card-text">
+                    <strong>{{ condiciones_alerta['usuarios_bloqueados']['count'] }}</strong> usuario(s) bloqueado(s) por seguridad.
+                </p>
+                <small class="text-muted">{{ condiciones_alerta['usuarios_bloqueados']['descripcion'] }}</small>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if 'db_critica' in condiciones_alerta %}
+        <div class="col-md-6">
+            <div class="card border-danger p-3 h-100">
+                <h5 class="card-title text-danger">🔴 BD Crítica</h5>
+                <p class="card-text">
+                    Tamaño de BD: <strong>{{ condiciones_alerta['db_critica']['size'] }} GB</strong>
+                </p>
+                <small class="text-muted">{{ condiciones_alerta['db_critica']['descripcion'] }}</small>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if 'backup_viejo' in condiciones_alerta %}
+        <div class="col-md-6">
+            <div class="card border-warning p-3 h-100">
+                <h5 class="card-title text-warning">🟡 Backup Antiguo</h5>
+                <p class="card-text">
+                    Último backup hace <strong>{{ condiciones_alerta['backup_viejo']['horas'] }} horas</strong>.
+                </p>
+                <small class="text-muted">{{ condiciones_alerta['backup_viejo']['descripcion'] }}</small>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if 'sin_backup' in condiciones_alerta %}
+        <div class="col-md-6">
+            <div class="card border-danger p-3 h-100">
+                <h5 class="card-title text-danger">🔴 Sin Backup</h5>
+                <p class="card-text">
+                    Nunca se ha realizado un backup.
+                </p>
+                <small class="text-muted">{{ condiciones_alerta['sin_backup']['descripcion'] }}</small>
+                <div class="mt-2">
+                    <a href="/admin/sistema" class="btn btn-sm btn-danger">Descargar Backup Ahora</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ACCIONES DISPONIBLES -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card p-3">
+                <h5 class="card-title">🧹 Limpieza de Datos Expirados</h5>
+                <p class="card-text text-muted">Elimina códigos de recuperación expirados, bloqueos vencidos, y logs antiguos.</p>
+                <form method="POST" action="/admin/limpiar-expirados" class="d-inline">
+                    <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('¿Ejecutar limpieza ahora?')">
+                        Ejecutar Limpieza
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card p-3">
+                <h5 class="card-title">📋 Ver Auditoría</h5>
+                <p class="card-text text-muted">Revisar el registro completo de acciones administrativas.</p>
+                <a href="/admin/auditoria" class="btn btn-info btn-sm">Ver Auditoría</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- INFORMACIÓN DE CONTACTO ADMIN -->
+    {% if correos_admin %}
+    <div class="card p-3 bg-light">
+        <h5 class="card-title">📧 Administradores del Sistema</h5>
+        <p class="card-text">
+            Los siguientes usuarios pueden recibir notificaciones de alertas:
+        </p>
+        <ul class="list-group list-group-flush">
+            {% for username, email in correos_admin %}
+            <li class="list-group-item bg-light">
+                <strong>{{ username }}</strong> — <code>{{ email }}</code>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <small class="text-muted">
+            <strong>Última actualización:</strong> {{ "now"|date("Y-m-d H:i:s") }}
+        </small>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, session, flash, send_file
-from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto, get_ubicaciones, add_ubicacion, delete_ubicacion, get_accesos_login, registrar_evento_sistema, get_panel_salud
+from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto, get_ubicaciones, add_ubicacion, delete_ubicacion, get_accesos_login, registrar_evento_sistema, get_panel_salud, registrar_accion_admin, limpiar_datos_expirados, get_auditoria, get_alertas_condiciones, get_usuarios_admin_email
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 import os
@@ -129,7 +129,25 @@ def usuarios():
                 (user, generate_password_hash(password), rol, email)
             )
             conn.commit()
-        except:
+            # 🔐 Auditoría: registrar creación de usuario
+            registrar_accion_admin(
+                accion='crear_usuario',
+                username=session.get('username', 'desconocido'),
+                estado='ok',
+                detalle=f'Usuario: {user}, Rol: {rol}, Email: {email}',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')
+            )
+        except Exception as e:
+            # 🔐 Auditoría: registrar fallo en creación de usuario
+            registrar_accion_admin(
+                accion='crear_usuario',
+                username=session.get('username', 'desconocido'),
+                estado='error',
+                detalle=f'Intento fallido: {str(e)}',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')
+            )
             return render_template("usuarios.html", error="Usuario o correo ya existe")
 
     # 👉 LISTAR
@@ -150,6 +168,15 @@ def eliminar_usuario(user):
 
     if user in ("admin", "superadmin"):
         flash("No puedes eliminar usuarios protegidos", "error")
+        # 🔐 Auditoría: intento no autorizado
+        registrar_accion_admin(
+            accion='eliminar_usuario',
+            username=session.get('username', 'desconocido'),
+            estado='error',
+            detalle=f'Intento de eliminar usuario protegido: {user}',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
         return redirect("/admin/usuarios")
 
     conn = conectar()
@@ -158,6 +185,16 @@ def eliminar_usuario(user):
     cursor.execute("DELETE FROM usuarios WHERE username=%s", (user,))
     conn.commit()
     conn.close()
+
+    # 🔐 Auditoría: eliminación exitosa
+    registrar_accion_admin(
+        accion='eliminar_usuario',
+        username=session.get('username', 'desconocido'),
+        estado='ok',
+        detalle=f'Usuario eliminado: {user}',
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent', '')
+    )
 
     return redirect("/admin/usuarios")
 
@@ -212,6 +249,14 @@ def exportar_db_xlsx():
     except Exception as e:
         try:
             registrar_evento_sistema('export_db_xlsx', 'error', f'Fallo exportacion: {str(e)[:220]}', session.get('user'))
+            registrar_accion_admin(
+                accion='exportar_db_xlsx',
+                username=session.get('username', 'desconocido'),
+                estado='error',
+                detalle=str(e)[:220],
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')
+            )
         except Exception:
             pass
         flash(f"No se pudo generar el archivo Excel: {str(e)}", "error")
@@ -220,6 +265,14 @@ def exportar_db_xlsx():
     nombre = f"aquamax_db_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     try:
         registrar_evento_sistema('export_db_xlsx', 'ok', f'Archivo: {nombre}', session.get('user'))
+        registrar_accion_admin(
+            accion='exportar_db_xlsx',
+            username=session.get('username', 'desconocido'),
+            estado='ok',
+            detalle=f'Archivo: {nombre}',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
     except Exception:
         pass
     return send_file(
@@ -288,6 +341,14 @@ def sistema():
 
                 cursor.execute("DELETE FROM inventario")
                 conn.commit()
+                registrar_accion_admin(
+                    accion='limpiar_inventario',
+                    username=session.get('username', 'desconocido'),
+                    estado='ok',
+                    detalle=f'Inventario limpiado. Respaldo: {backup_path}',
+                    ip_address=request.remote_addr,
+                    user_agent=request.headers.get('User-Agent', '')
+                )
                 flash(f"Inventario limpiado. Respaldo: {backup_path}", "success")
 
             elif action == "reiniciar_datos":
@@ -299,6 +360,14 @@ def sistema():
                 cursor.execute("DELETE FROM productos")
                 cursor.execute("DELETE FROM usuarios WHERE rol NOT IN ('admin', 'superadmin')")
                 conn.commit()
+                registrar_accion_admin(
+                    accion='reiniciar_datos',
+                    username=session.get('username', 'desconocido'),
+                    estado='ok',
+                    detalle=f'Datos del sistema reiniciados. Respaldo: {backup_path}',
+                    ip_address=request.remote_addr,
+                    user_agent=request.headers.get('User-Agent', '')
+                )
                 flash(f"Datos reiniciados correctamente. Respaldo: {backup_path}", "success")
 
             else:
@@ -463,3 +532,103 @@ def accesos_login_admin():
             "fecha_hasta": fecha_hasta,
         },
     )
+
+
+# 🔍 AUDITORÍA: Ver registro de acciones administrativas
+
+@usuarios_bp.route('/auditoria')
+def auditoria():
+    if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
+        return render_template("acceso_denegado.html"), 403
+
+    accion_filtro = request.args.get('accion', '')
+    usuario_filtro = request.args.get('usuario', '')
+    limit = int(request.args.get('limit', '200'))
+    
+    try:
+        registros = get_auditoria(
+            accion=accion_filtro or None,
+            username=usuario_filtro or None,
+            limit=min(limit, 500)  # Máximo 500
+        )
+    except Exception as e:
+        flash(f"No se pudo cargar auditoría: {str(e)}", "error")
+        registros = []
+    
+    # Acciones únicas para el dropdown de filtro
+    try:
+        conn = conectar()
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT accion FROM system_events WHERE evento = 'admin_action' ORDER BY accion")
+        acciones_disponibles = [row[0] for row in cursor.fetchall()]
+        conn.close()
+    except:
+        acciones_disponibles = []
+    
+    return render_template(
+        "auditoria.html",
+        registros=registros,
+        acciones_disponibles=acciones_disponibles,
+        filtros={'accion': accion_filtro, 'usuario': usuario_filtro, 'limit': limit}
+    )
+
+
+# 🚨 ALERTAS: Ver condiciones críticas del sistema
+
+@usuarios_bp.route('/alertas')
+def alertas_sistema():
+    if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
+        return render_template("acceso_denegado.html"), 403
+
+    try:
+        condiciones_alerta = get_alertas_condiciones()
+        hay_alertas = len(condiciones_alerta) > 0
+    except Exception as e:
+        flash(f"No se pudo cargar alertas: {str(e)}", "error")
+        condiciones_alerta = {}
+        hay_alertas = False
+    
+    # Obtener correos de admins para mostrar (sin enviar emails aún)
+    try:
+        correos_admin = get_usuarios_admin_email()
+    except:
+        correos_admin = []
+    
+    return render_template(
+        "alertas_sistema.html",
+        condiciones_alerta=condiciones_alerta,
+        hay_alertas=hay_alertas,
+        correos_admin=correos_admin
+    )
+
+
+# 🧹 LIMPIEZA: Ejecutar limpieza manual de datos expirados
+
+@usuarios_bp.route('/limpiar-expirados', methods=['POST'])
+def limpiar_expirados_manual():
+    if "rol" not in session or session["rol"] != "superadmin":
+        return render_template("acceso_denegado.html"), 403
+    
+    try:
+        resultado = limpiar_datos_expirados()
+        registrar_accion_admin(
+            accion='limpiar_expirados_manual',
+            username=session.get('username', 'desconocido'),
+            estado='ok',
+            detalle=f"Códigos: {resultado['deleted_codes']}, Usuarios desbloqueados: {resultado['unblocked_users']}, Emails: {resultado['deleted_emails']}, Sesiones: {resultado['deleted_sessions']}",
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+        flash(f"Limpieza completada. Eliminados {resultado['deleted_codes']} códigos, {resultado['deleted_emails']} emails, {resultado['deleted_sessions']} sesiones.", "success")
+    except Exception as e:
+        registrar_accion_admin(
+            accion='limpiar_expirados_manual',
+            username=session.get('username', 'desconocido'),
+            estado='error',
+            detalle=str(e)[:220],
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+        flash(f"Error en limpieza: {str(e)}", "error")
+    
+    return redirect("/admin/alertas")
