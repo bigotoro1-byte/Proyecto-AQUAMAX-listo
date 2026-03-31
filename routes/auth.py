@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, session, current_app
-from database.db import conectar, actualizar_contrasena
+from database.db import conectar, actualizar_contrasena, registrar_acceso_login
 from werkzeug.security import check_password_hash, generate_password_hash
 import requests
 import random
@@ -205,6 +205,19 @@ def login():
             FAILED_LOGINS.pop(key, None)
             session["user"] = usuario[0]
             session["rol"] = usuario[2]
+
+            # Auditoria: registrar ingreso exitoso
+            ip = (
+                request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+                or request.headers.get("X-Real-IP")
+                or request.remote_addr
+            )
+            user_agent = request.headers.get("User-Agent", "")[:255]
+            try:
+                registrar_acceso_login(usuario[0], usuario[2], ip, user_agent)
+            except Exception as e:
+                current_app.logger.error(f"No se pudo registrar acceso de login: {str(e)}")
+
             # Detectar contraseña débil/default y forzar cambio
             passwords_debiles = ["1234", "admin", "password", "aquamax", "123456", "1234abcd"]
             es_debil = any(

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+    <h2>🕒 Historial de Ingresos al Sistema</h2>
+    <p class="text-muted">Ultimos 200 inicios de sesion exitosos.</p>
+
+    <div class="card p-3 shadow">
+        <div class="table-responsive">
+            <table class="table table-hover tabla-pro align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Usuario</th>
+                        <th>Rol</th>
+                        <th>IP</th>
+                        <th>Navegador / Dispositivo</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if accesos %}
+                        {% for a in accesos %}
+                        <tr>
+                            <td class="fw-semibold">{{ a[0] }}</td>
+                            <td>{{ a[1] or '-' }}</td>
+                            <td>{{ a[2] or '-' }}</td>
+                            <td style="max-width: 420px; word-break: break-word;">{{ a[3] or '-' }}</td>
+                            <td>{{ a[4] }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">No hay ingresos registrados.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

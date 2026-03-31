@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, session, flash
-from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto, get_ubicaciones, add_ubicacion, delete_ubicacion
+from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto, get_ubicaciones, add_ubicacion, delete_ubicacion, get_accesos_login
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 import os
@@ -291,3 +291,17 @@ def eliminar_ubicacion(nombre):
         flash(f"No se pudo eliminar la ubicacion: {str(e)}", "error")
 
     return redirect("/admin/ubicaciones")
+
+
+@usuarios_bp.route("/accesos")
+def accesos_login_admin():
+    if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
+        return render_template("acceso_denegado.html"), 403
+
+    try:
+        accesos = get_accesos_login(200)
+    except Exception as e:
+        flash(f"No se pudo cargar el historial de accesos: {str(e)}", "error")
+        accesos = []
+
+    return render_template("accesos_login.html", accesos=accesos)

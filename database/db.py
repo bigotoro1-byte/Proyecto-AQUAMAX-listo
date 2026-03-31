@@ -132,12 +132,26 @@ def crear_tablas():
     )
     """)
 
+    # Auditoria de accesos al sistema
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS accesos_login (
+        id SERIAL PRIMARY KEY,
+        username TEXT NOT NULL,
+        rol TEXT,
+        ip TEXT,
+        user_agent TEXT,
+        fecha TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+    """)
+
     # Indices para rendimiento en consultas frecuentes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventario_producto_piscina ON inventario(producto, piscina)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventario_fecha ON inventario(fecha)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_movimientos_usuario_tipo ON movimientos(usuario, tipo)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_movimientos_fecha ON movimientos(fecha)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cfg_producto_producto ON configuracion_producto(producto)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_accesos_login_fecha ON accesos_login(fecha DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_accesos_login_username ON accesos_login(username)")
 
     # Valores por defecto para ajustes de stock
     defaults = {
@@ -162,6 +176,20 @@ def actualizar_tabla():
     try:
         # Migracion: agregar email de recuperacion por usuario
         cursor.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS email TEXT")
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS accesos_login (
+                id SERIAL PRIMARY KEY,
+                username TEXT NOT NULL,
+                rol TEXT,
+                ip TEXT,
+                user_agent TEXT,
+                fecha TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_accesos_login_fecha ON accesos_login(fecha DESC)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_accesos_login_username ON accesos_login(username)")
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -477,6 +505,39 @@ def delete_ubicacion(nombre):
         raise e
     finally:
         conn.close()
+
+
+def registrar_acceso_login(username, rol=None, ip=None, user_agent=None):
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO accesos_login (username, rol, ip, user_agent) VALUES (%s, %s, %s, %s)",
+            (username, rol, ip, user_agent),
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def get_accesos_login(limit=100):
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT username, rol, ip, user_agent, fecha
+        FROM accesos_login
+        ORDER BY fecha DESC
+        LIMIT %s
+        """,
+        (limit,),
+    )
+    data = cursor.fetchall()
+    conn.close()
+    return data
 
 def descontar_stock(producto, cantidad, usuario=None):
     cantidad = _cantidad_positiva(cantidad)
