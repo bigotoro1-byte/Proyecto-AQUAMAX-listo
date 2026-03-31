@@ -217,11 +217,19 @@ def recuperar_contrasena():
             if not user or not email:
                 return render_template('recuperar_contrasena.html', error='Completa usuario y correo', step=1)
 
-            conn = conectar()
-            cursor = conn.cursor()
-            cursor.execute('SELECT * FROM usuarios WHERE LOWER(username) = LOWER(%s)', (user,))
-            usuario = cursor.fetchone()
-            conn.close()
+            try:
+                conn = conectar()
+                cursor = conn.cursor()
+                cursor.execute('SELECT * FROM usuarios WHERE LOWER(username) = LOWER(%s)', (user,))
+                usuario = cursor.fetchone()
+                conn.close()
+            except Exception as e:
+                current_app.logger.error(f'Error consultando usuario para recuperacion: {str(e)}')
+                return render_template(
+                    'recuperar_contrasena.html',
+                    error='Sistema ocupado temporalmente. Intenta nuevamente en unos segundos.',
+                    step=1
+                )
 
             if not usuario:
                 return render_template('recuperar_contrasena.html', error='Usuario no existe', step=1)
@@ -310,7 +318,11 @@ def recuperar_contrasena():
                 return render_template('recuperar_contrasena.html', error='La contraseña debe tener al menos 8 caracteres, letras y numeros', step=2)
 
             # Actualizar contraseña
-            actualizar_contrasena(session['recovery_user'], generate_password_hash(nueva))
+            try:
+                actualizar_contrasena(session['recovery_user'], generate_password_hash(nueva))
+            except Exception as e:
+                current_app.logger.error(f'Error actualizando contraseña por recuperacion: {str(e)}')
+                return render_template('recuperar_contrasena.html', error='No se pudo actualizar la contraseña. Intenta nuevamente.', step=2)
             session.pop('recovery_user', None)
             session.pop('recovery_code', None)
             session.pop('recovery_attempts', None)
