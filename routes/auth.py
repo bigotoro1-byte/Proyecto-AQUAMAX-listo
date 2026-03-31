@@ -39,6 +39,8 @@ def _send_recovery_email(user, email, codigo):
     resend_from = (os.getenv('RESEND_FROM') or '').strip() or 'onboarding@resend.dev'
     smtp_from = os.getenv('MAIL_FROM', 'aquamax@tuempresa.com')
 
+    resend_error = ''
+
     # 1) Intento principal: Resend API (HTTPS/443).
     if resend_api_key:
         try:
@@ -69,10 +71,10 @@ def _send_recovery_email(user, email, codigo):
                     detalle = f'{detalle}: {msg}'
             except Exception:
                 pass
-            return False, detalle
+            resend_error = detalle
         except requests.RequestException as e:
             current_app.logger.error(f'Error Resend: {str(e)}')
-            return False, f'Resend red: {str(e)}'
+            resend_error = f'Resend red: {str(e)}'
 
     # 2) Fallback: SMTP clásico.
     mail_server = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
@@ -81,7 +83,7 @@ def _send_recovery_email(user, email, codigo):
     mail_pass = os.getenv('MAIL_PASSWORD')
 
     if not mail_user or not mail_pass:
-        return False, 'SMTP sin credenciales'
+        return False, resend_error or 'SMTP sin credenciales'
 
     try:
         msg = MIMEMultipart('alternative')
@@ -100,7 +102,10 @@ def _send_recovery_email(user, email, codigo):
         return True, ''
     except Exception as e:
         current_app.logger.error(f'Error SMTP fallback: {str(e)}')
-        return False, f'SMTP: {str(e)}'
+        smtp_error = f'SMTP: {str(e)}'
+        if resend_error:
+            return False, f'{resend_error} | {smtp_error}'
+        return False, smtp_error
 
 
 def _password_matches(expected_value, provided_password):
