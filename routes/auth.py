@@ -1,7 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, session, current_app
 from database.db import conectar, actualizar_contrasena
 from werkzeug.security import check_password_hash, generate_password_hash
-import requests
 import random
 import string
 from datetime import datetime
@@ -35,10 +34,7 @@ def _send_recovery_email(user, email, codigo):
         'Si no solicitaste esto, ignora este mensaje.'
     )
 
-    resend_api_key = (os.getenv('RESEND_API_KEY') or '').strip()
-    resend_from = (os.getenv('RESEND_FROM') or '').strip() or 'onboarding@resend.dev'
-
-    # 1) Intento principal: SMTP clásico (como antes del cambio).
+    # Envio por SMTP.
     mail_server = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
     mail_port = int(os.getenv('MAIL_PORT', 587))
     mail_user = os.getenv('MAIL_USERNAME')
@@ -51,69 +47,27 @@ def _send_recovery_email(user, email, codigo):
     else:
         smtp_from = smtp_from_env or mail_user or 'no-reply@localhost'
 
-    smtp_error = ''
+    if not mail_user or not mail_pass:
+        return False, 'SMTP sin credenciales'
 
-    if mail_user and mail_pass:
-        try:
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = subject
-            msg['From'] = smtp_from
-            msg['To'] = email
-            msg_text = MIMEText(body, 'plain', 'utf-8')
-            msg.attach(msg_text)
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = smtp_from
+        msg['To'] = email
+        msg_text = MIMEText(body, 'plain', 'utf-8')
+        msg.attach(msg_text)
 
-            with smtplib.SMTP(mail_server, mail_port, timeout=8) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(mail_user, mail_pass)
-                server.send_message(msg)
-            return True, ''
-        except Exception as e:
-            current_app.logger.error(f'Error SMTP: {str(e)}')
-            smtp_error = f'SMTP: {str(e)}'
-    else:
-        smtp_error = 'SMTP sin credenciales'
-
-    # 2) Fallback: Resend API (HTTPS/443).
-    resend_error = ''
-    if resend_api_key:
-        try:
-            response = requests.post(
-                'https://api.resend.com/emails',
-                headers={
-                    'Authorization': f'Bearer {resend_api_key}',
-                    'Content-Type': 'application/json',
-                },
-                json={
-                    'from': resend_from,
-                    'to': [email],
-                    'subject': subject,
-                    'text': body,
-                },
-                timeout=8,
-            )
-            if response.status_code in (200, 201, 202):
-                return True, ''
-            current_app.logger.error(
-                f'Resend fallo ({response.status_code}): {response.text[:300]}'
-            )
-            detalle = f'Resend {response.status_code}'
-            try:
-                data = response.json()
-                msg = data.get('message') if isinstance(data, dict) else None
-                if msg:
-                    detalle = f'{detalle}: {msg}'
-            except Exception:
-                pass
-            resend_error = detalle
-        except requests.RequestException as e:
-            current_app.logger.error(f'Error Resend: {str(e)}')
-            resend_error = f'Resend red: {str(e)}'
-
-    if smtp_error and resend_error:
-        return False, f'{smtp_error} | {resend_error}'
-    return False, smtp_error or resend_error or 'No se pudo enviar correo'
+        with smtplib.SMTP(mail_server, mail_port, timeout=8) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(mail_user, mail_pass)
+            server.send_message(msg)
+        return True, ''
+    except Exception as e:
+        current_app.logger.error(f'Error SMTP: {str(e)}')
+        return False, f'SMTP: {str(e)}'
 
 
 def _password_matches(expected_value, provided_password):
