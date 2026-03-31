@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, session, current_app
-from database.db import conectar, actualizar_contrasena, registrar_acceso_login, cerrar_acceso_login
+from database.db import conectar, actualizar_contrasena, registrar_acceso_login, cerrar_acceso_login, cerrar_accesos_activos_usuario
 from werkzeug.security import check_password_hash, generate_password_hash
 import requests
 import random
@@ -209,6 +209,12 @@ def login():
             session["login_at_ts"] = now_ts
             session["last_activity_ts"] = now_ts
             session.permanent = True
+
+            # Evita dejar sesiones previas del mismo usuario en estado "Activa".
+            try:
+                cerrar_accesos_activos_usuario(usuario[0])
+            except Exception as e:
+                current_app.logger.error(f"No se pudieron cerrar accesos previos del usuario: {str(e)}")
 
             # Auditoria: registrar ingreso exitoso
             ip = (

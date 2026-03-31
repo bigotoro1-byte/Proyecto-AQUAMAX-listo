@@ -555,6 +555,30 @@ def cerrar_acceso_login(acceso_id):
         conn.close()
 
 
+def cerrar_accesos_activos_usuario(username):
+    if not username:
+        return
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            UPDATE accesos_login
+            SET
+                fecha_salida = NOW(),
+                duracion_segundos = GREATEST(0, EXTRACT(EPOCH FROM (NOW() - fecha))::int)
+            WHERE LOWER(username) = LOWER(%s) AND fecha_salida IS NULL
+            """,
+            (username,),
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
 def get_accesos_login(limit=100, username=None, fecha_desde=None, fecha_hasta=None):
     conn = conectar()
     cursor = conn.cursor()
