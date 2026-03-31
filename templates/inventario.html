@@ -52,8 +52,11 @@
     {{ salida_form.hidden_tag() }}
 
     <div class="mb-3">
+        <label for="buscar-producto-salida" class="form-label">Buscar producto</label>
+        <input type="text" id="buscar-producto-salida" class="form-control mb-2" placeholder="Escribe para filtrar...">
+
         {{ salida_form.producto.label(class="form-label") }}
-        {{ salida_form.producto(class="form-select") }}
+        {{ salida_form.producto(class="form-select", id="salida-producto-select") }}
         <div class="small text-muted mt-1" id="stock-disponible-general">Disponible en GENERAL: --</div>
         {% if salida_form.producto.errors %}
             <div class="text-danger small">
@@ -194,7 +197,8 @@ Ahora tu sistema muestra:
 
 <script>
 const stockGeneralMap = {{ stock_general_map|tojson }};
-const productoSelect = document.getElementById("{{ salida_form.producto.id }}");
+const productoSelect = document.getElementById("salida-producto-select");
+const buscarProductoInput = document.getElementById("buscar-producto-salida");
 const stockInfo = document.getElementById("stock-disponible-general");
 
 function actualizarStockDisponible() {
@@ -203,7 +207,42 @@ function actualizarStockDisponible() {
     stockInfo.textContent = `Disponible en GENERAL: ${disponible}`;
 }
 
+function filtrarProductosSalida() {
+    if (!productoSelect || !buscarProductoInput || !productoSelect._allOptions) return;
+
+    const filtro = (buscarProductoInput.value || "").toLowerCase().trim();
+    const opcionesOriginales = productoSelect._allOptions;
+    const seleccionadoActual = productoSelect.value;
+
+    productoSelect.innerHTML = "";
+
+    const opcionesFiltradas = opcionesOriginales.filter((opt) => {
+        const texto = (opt.text || "").toLowerCase();
+        const valor = (opt.value || "").toLowerCase();
+        return !filtro || texto.includes(filtro) || valor.includes(filtro);
+    });
+
+    opcionesFiltradas.forEach((opt) => {
+        productoSelect.appendChild(opt.cloneNode(true));
+    });
+
+    if (opcionesFiltradas.length === 0) {
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = "Sin coincidencias";
+        productoSelect.appendChild(empty);
+    } else if (opcionesFiltradas.some((opt) => opt.value === seleccionadoActual)) {
+        productoSelect.value = seleccionadoActual;
+    }
+
+    actualizarStockDisponible();
+}
+
 if (productoSelect && stockInfo) {
+    productoSelect._allOptions = Array.from(productoSelect.options).map((opt) => opt.cloneNode(true));
+    if (buscarProductoInput) {
+        buscarProductoInput.addEventListener("input", filtrarProductosSalida);
+    }
     productoSelect.addEventListener("change", actualizarStockDisponible);
     actualizarStockDisponible();
 }
