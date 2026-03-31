@@ -24,7 +24,7 @@ if not secret_key:
 app.secret_key = secret_key
 
 # Cierre automatico de sesion por inactividad (minutos)
-session_timeout_minutes = int(os.getenv('SESSION_TIMEOUT_MINUTES', '30'))
+session_timeout_minutes = int(os.getenv('SESSION_TIMEOUT_MINUTES', '6'))
 if session_timeout_minutes < 5:
     session_timeout_minutes = 5
 app.config['SESSION_TIMEOUT_SECONDS'] = session_timeout_minutes * 60
