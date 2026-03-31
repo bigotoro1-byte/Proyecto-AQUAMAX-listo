@@ -97,6 +97,7 @@
                 <h5 class="card-title">🧹 Limpieza de Datos Expirados</h5>
                 <p class="card-text text-muted">Elimina códigos de recuperación expirados, bloqueos vencidos, y logs antiguos.</p>
                 <form method="POST" action="/admin/limpiar-expirados" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('¿Ejecutar limpieza ahora?')">
                         Ejecutar Limpieza
                     </button>
