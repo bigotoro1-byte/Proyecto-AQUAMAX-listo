@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, session, flash, send_file
-from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto, get_ubicaciones, add_ubicacion, delete_ubicacion, get_accesos_login
+from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto, get_ubicaciones, add_ubicacion, delete_ubicacion, get_accesos_login, registrar_evento_sistema, get_panel_salud
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 import os
@@ -210,16 +210,56 @@ def exportar_db_xlsx():
     try:
         excel_buffer = _generar_excel_db()
     except Exception as e:
+        try:
+            registrar_evento_sistema('export_db_xlsx', 'error', f'Fallo exportacion: {str(e)[:220]}', session.get('user'))
+        except Exception:
+            pass
         flash(f"No se pudo generar el archivo Excel: {str(e)}", "error")
         return redirect("/admin/sistema")
 
     nombre = f"aquamax_db_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    try:
+        registrar_evento_sistema('export_db_xlsx', 'ok', f'Archivo: {nombre}', session.get('user'))
+    except Exception:
+        pass
     return send_file(
         excel_buffer,
         as_attachment=True,
         download_name=nombre,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+@usuarios_bp.route('/salud')
+def salud_sistema():
+    if "rol" not in session or session["rol"] not in ("admin", "superadmin"):
+        return render_template("acceso_denegado.html"), 403
+
+    try:
+        salud = get_panel_salud(limit_emails=12)
+    except Exception as e:
+        flash(f"No se pudo cargar el panel de salud: {str(e)}", "error")
+        salud = {
+            'db_size_bytes': 0,
+            'sesiones_activas': 0,
+            'fallos_24h': 0,
+            'bloqueos_activos': 0,
+            'ultimo_backup': None,
+            'ultimo_email': None,
+            'emails_recientes': [],
+        }
+
+    bytes_val = int(salud.get('db_size_bytes') or 0)
+    if bytes_val < 1024:
+        db_size = f"{bytes_val} B"
+    elif bytes_val < 1024 * 1024:
+        db_size = f"{bytes_val / 1024:.2f} KB"
+    elif bytes_val < 1024 * 1024 * 1024:
+        db_size = f"{bytes_val / (1024 * 1024):.2f} MB"
+    else:
+        db_size = f"{bytes_val / (1024 * 1024 * 1024):.2f} GB"
+
+    return render_template('salud_sistema.html', salud=salud, db_size=db_size)
 
 
 @usuarios_bp.route("/sistema", methods=["GET", "POST"])

@@ -170,6 +170,34 @@ def crear_tablas():
     )
     """)
 
+    # Eventos operativos para panel de salud
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS system_events (
+            id SERIAL PRIMARY KEY,
+            evento TEXT NOT NULL,
+            estado TEXT NOT NULL,
+            detalle TEXT,
+            username TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+
+    # Log de envios de correo
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS email_envios_log (
+            id SERIAL PRIMARY KEY,
+            destino TEXT,
+            proveedor TEXT,
+            estado TEXT NOT NULL,
+            detalle TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+
     # Indices para rendimiento en consultas frecuentes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventario_producto_piscina ON inventario(producto, piscina)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventario_fecha ON inventario(fecha)")
@@ -180,6 +208,8 @@ def crear_tablas():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_accesos_login_username ON accesos_login(username)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_auth_login_state_blocked_until ON auth_login_state(blocked_until)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_password_recovery_state_expires_at ON password_recovery_state(expires_at)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_events_evento_created ON system_events(evento, created_at DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_email_envios_log_created_at ON email_envios_log(created_at DESC)")
 
     # Valores por defecto para ajustes de stock
     defaults = {
@@ -247,8 +277,34 @@ def actualizar_tabla():
             """
         )
         cursor.execute("ALTER TABLE password_recovery_state ADD COLUMN IF NOT EXISTS codigo_hash TEXT")
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS system_events (
+                id SERIAL PRIMARY KEY,
+                evento TEXT NOT NULL,
+                estado TEXT NOT NULL,
+                detalle TEXT,
+                username TEXT,
+                created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS email_envios_log (
+                id SERIAL PRIMARY KEY,
+                destino TEXT,
+                proveedor TEXT,
+                estado TEXT NOT NULL,
+                detalle TEXT,
+                created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """
+        )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_auth_login_state_blocked_until ON auth_login_state(blocked_until)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_password_recovery_state_expires_at ON password_recovery_state(expires_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_system_events_evento_created ON system_events(evento, created_at DESC)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_email_envios_log_created_at ON email_envios_log(created_at DESC)")
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -716,6 +772,106 @@ def clear_password_recovery_state(username):
     except Exception as e:
         conn.rollback()
         raise e
+    finally:
+        conn.close()
+
+
+def registrar_evento_sistema(evento, estado, detalle=None, username=None):
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO system_events (evento, estado, detalle, username) VALUES (%s, %s, %s, %s)",
+            (evento, estado, (detalle or None), username),
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def registrar_email_envio(destino, proveedor, estado, detalle=None):
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO email_envios_log (destino, proveedor, estado, detalle) VALUES (%s, %s, %s, %s)",
+            (destino, proveedor, estado, (detalle or None)),
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def get_panel_salud(limit_emails=10):
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT pg_database_size(current_database())")
+        db_size_bytes = int(cursor.fetchone()[0] or 0)
+
+        cursor.execute("SELECT COUNT(*) FROM accesos_login WHERE fecha_salida IS NULL")
+        sesiones_activas = int(cursor.fetchone()[0] or 0)
+
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM auth_login_state
+            WHERE updated_at >= NOW() - INTERVAL '24 hours'
+              AND failed_count > 0
+            """
+        )
+        fallos_24h = int(cursor.fetchone()[0] or 0)
+
+        cursor.execute("SELECT COUNT(*) FROM auth_login_state WHERE blocked_until IS NOT NULL AND blocked_until > NOW()")
+        bloqueos_activos = int(cursor.fetchone()[0] or 0)
+
+        cursor.execute(
+            """
+            SELECT created_at, username, detalle
+            FROM system_events
+            WHERE evento = 'export_db_xlsx' AND estado = 'ok'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+        )
+        ultimo_backup = cursor.fetchone()
+
+        cursor.execute(
+            """
+            SELECT created_at, proveedor, estado, detalle
+            FROM email_envios_log
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+        )
+        ultimo_email = cursor.fetchone()
+
+        cursor.execute(
+            """
+            SELECT created_at, destino, proveedor, estado, detalle
+            FROM email_envios_log
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (int(limit_emails),),
+        )
+        emails_recientes = cursor.fetchall()
+
+        return {
+            'db_size_bytes': db_size_bytes,
+            'sesiones_activas': sesiones_activas,
+            'fallos_24h': fallos_24h,
+            'bloqueos_activos': bloqueos_activos,
+            'ultimo_backup': ultimo_backup,
+            'ultimo_email': ultimo_email,
+            'emails_recientes': emails_recientes,
+        }
     finally:
         conn.close()
 

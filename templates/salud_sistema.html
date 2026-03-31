@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+    <h2 class="mb-3">🩺 Salud del Sistema</h2>
+    <p class="text-muted">Estado operativo en tiempo real para administración.</p>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-3 col-md-6 col-12">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">Tamaño DB</div>
+                <div class="h4 mb-0">{{ db_size }}</div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 col-12">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">Sesiones activas</div>
+                <div class="h4 mb-0">{{ salud.sesiones_activas }}</div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 col-12">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">Fallos login (24h)</div>
+                <div class="h4 mb-0">{{ salud.fallos_24h }}</div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 col-12">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">Bloqueos activos</div>
+                <div class="h4 mb-0">{{ salud.bloqueos_activos }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6 col-12">
+            <div class="card p-3 h-100">
+                <h5 class="mb-3">Último respaldo registrado</h5>
+                {% if salud.ultimo_backup %}
+                    <div><b>Fecha:</b> {{ salud.ultimo_backup[0] }}</div>
+                    <div><b>Usuario:</b> {{ salud.ultimo_backup[1] or '-' }}</div>
+                    <div><b>Detalle:</b> {{ salud.ultimo_backup[2] or '-' }}</div>
+                {% else %}
+                    <div class="text-muted">Aún no hay exportaciones .xlsx registradas.</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-6 col-12">
+            <div class="card p-3 h-100">
+                <h5 class="mb-3">Último estado de correo</h5>
+                {% if salud.ultimo_email %}
+                    <div><b>Fecha:</b> {{ salud.ultimo_email[0] }}</div>
+                    <div><b>Proveedor:</b> {{ salud.ultimo_email[1] or '-' }}</div>
+                    <div><b>Estado:</b>
+                        {% if salud.ultimo_email[2] == 'ok' %}
+                        <span class="badge bg-success">OK</span>
+                        {% else %}
+                        <span class="badge bg-danger">ERROR</span>
+                        {% endif %}
+                    </div>
+                    <div><b>Detalle:</b> {{ salud.ultimo_email[3] or '-' }}</div>
+                {% else %}
+                    <div class="text-muted">Aún no hay envíos de correo registrados.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-3 shadow-sm">
+        <h5 class="mb-3">Historial reciente de correos</h5>
+        <div class="table-responsive table-sticky-wrap">
+            <table class="table table-hover tabla-pro align-middle table-sticky mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Destino</th>
+                        <th>Proveedor</th>
+                        <th>Estado</th>
+                        <th>Detalle</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if salud.emails_recientes %}
+                        {% for e in salud.emails_recientes %}
+                        <tr>
+                            <td>{{ e[0] }}</td>
+                            <td>{{ e[1] or '-' }}</td>
+                            <td>{{ e[2] or '-' }}</td>
+                            <td>
+                                {% if e[3] == 'ok' %}
+                                <span class="badge bg-success">OK</span>
+                                {% else %}
+                                <span class="badge bg-danger">ERROR</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ e[4] or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Sin registros de correo todavía.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

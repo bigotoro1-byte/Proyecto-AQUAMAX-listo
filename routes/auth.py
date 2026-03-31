@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, session, current_app
-from database.db import conectar, actualizar_contrasena, registrar_acceso_login, cerrar_acceso_login, cerrar_accesos_activos_usuario, get_auth_login_state, reset_auth_login_state, register_failed_login, save_password_recovery_state, get_password_recovery_state, increment_password_recovery_attempts, clear_password_recovery_state
+from database.db import conectar, actualizar_contrasena, registrar_acceso_login, cerrar_acceso_login, cerrar_accesos_activos_usuario, get_auth_login_state, reset_auth_login_state, register_failed_login, save_password_recovery_state, get_password_recovery_state, increment_password_recovery_attempts, clear_password_recovery_state, registrar_email_envio
 from werkzeug.security import check_password_hash, generate_password_hash
 import requests
 import random
@@ -59,6 +59,10 @@ def _send_recovery_email(user, email, codigo):
                 timeout=10,
             )
             if response.status_code in (200, 201, 202):
+                try:
+                    registrar_email_envio(email, 'brevo', 'ok', 'Email de recuperacion enviado')
+                except Exception:
+                    pass
                 return True, ''
 
             detalle = f'Brevo {response.status_code}'
@@ -69,9 +73,17 @@ def _send_recovery_email(user, email, codigo):
             except Exception:
                 pass
             current_app.logger.error(f'Error Brevo: {detalle}')
+            try:
+                registrar_email_envio(email, 'brevo', 'error', detalle[:250])
+            except Exception:
+                pass
             # Continúa a SMTP fallback.
         except requests.RequestException as e:
             current_app.logger.error(f'Error de red Brevo: {str(e)}')
+            try:
+                registrar_email_envio(email, 'brevo', 'error', str(e)[:250])
+            except Exception:
+                pass
             # Continúa a SMTP fallback.
 
     # 2) Fallback: SMTP.
@@ -104,9 +116,17 @@ def _send_recovery_email(user, email, codigo):
             server.ehlo()
             server.login(mail_user, mail_pass)
             server.send_message(msg)
+        try:
+            registrar_email_envio(email, 'smtp', 'ok', 'Email de recuperacion enviado')
+        except Exception:
+            pass
         return True, ''
     except Exception as e:
         current_app.logger.error(f'Error SMTP: {str(e)}')
+        try:
+            registrar_email_envio(email, 'smtp', 'error', str(e)[:250])
+        except Exception:
+            pass
         return False, f'SMTP: {str(e)}'
 
 
