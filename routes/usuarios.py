@@ -598,7 +598,8 @@ def alertas_sistema():
         "alertas_sistema.html",
         condiciones_alerta=condiciones_alerta,
         hay_alertas=hay_alertas,
-        correos_admin=correos_admin
+        correos_admin=correos_admin,
+        ultima_actualizacion=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     )
 
 
