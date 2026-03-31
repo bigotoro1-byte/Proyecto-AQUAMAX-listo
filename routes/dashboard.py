@@ -112,7 +112,7 @@ def reporte():
         WHERE 1=1
     """
     mov_params = []
-    if rol_actual != "admin":
+    if rol_actual not in ("admin", "superadmin"):
         mov_query += " AND m.usuario = %s"
         mov_params.append(usuario_actual)
     if producto:
@@ -209,7 +209,7 @@ def generar_pdf():
     """
     mov_params = []
 
-    if rol_actual != "admin":
+    if rol_actual not in ("admin", "superadmin"):
         mov_query += " AND m.usuario = %s"
         mov_params.append(usuario_actual)
 
