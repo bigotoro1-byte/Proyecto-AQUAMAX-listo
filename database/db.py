@@ -146,6 +146,29 @@ def crear_tablas():
     )
     """)
 
+    # Estado persistente de intentos de login
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS auth_login_state (
+        username TEXT PRIMARY KEY,
+        failed_count INTEGER NOT NULL DEFAULT 0,
+        blocked_until TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+    """)
+
+    # Estado persistente de recuperacion de contraseña
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS password_recovery_state (
+        username TEXT PRIMARY KEY,
+        email TEXT,
+        codigo TEXT,
+        intentos INTEGER NOT NULL DEFAULT 0,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+    """)
+
     # Indices para rendimiento en consultas frecuentes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventario_producto_piscina ON inventario(producto, piscina)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventario_fecha ON inventario(fecha)")
@@ -154,6 +177,8 @@ def crear_tablas():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cfg_producto_producto ON configuracion_producto(producto)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_accesos_login_fecha ON accesos_login(fecha DESC)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_accesos_login_username ON accesos_login(username)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auth_login_state_blocked_until ON auth_login_state(blocked_until)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_password_recovery_state_expires_at ON password_recovery_state(expires_at)")
 
     # Valores por defecto para ajustes de stock
     defaults = {
@@ -196,6 +221,31 @@ def actualizar_tabla():
         cursor.execute("ALTER TABLE accesos_login ADD COLUMN IF NOT EXISTS duracion_segundos INTEGER")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_accesos_login_fecha ON accesos_login(fecha DESC)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_accesos_login_username ON accesos_login(username)")
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS auth_login_state (
+                username TEXT PRIMARY KEY,
+                failed_count INTEGER NOT NULL DEFAULT 0,
+                blocked_until TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS password_recovery_state (
+                username TEXT PRIMARY KEY,
+                email TEXT,
+                codigo TEXT,
+                intentos INTEGER NOT NULL DEFAULT 0,
+                expires_at TIMESTAMP,
+                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_auth_login_state_blocked_until ON auth_login_state(blocked_until)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_password_recovery_state_expires_at ON password_recovery_state(expires_at)")
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -505,6 +555,159 @@ def delete_ubicacion(nombre):
     cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM ubicaciones WHERE nombre = %s", (nombre,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def get_auth_login_state(username):
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT failed_count, blocked_until FROM auth_login_state WHERE LOWER(username) = LOWER(%s)",
+        (username,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+
+def reset_auth_login_state(username):
+    if not username:
+        return
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM auth_login_state WHERE LOWER(username) = LOWER(%s)", (username,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def register_failed_login(username, max_attempts, lockout_seconds):
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT failed_count, blocked_until FROM auth_login_state WHERE LOWER(username) = LOWER(%s)",
+            (username,),
+        )
+        row = cursor.fetchone()
+        failed_count = int(row[0]) if row else 0
+        failed_count += 1
+
+        blocked_until = None
+        stored_count = failed_count
+        if failed_count >= int(max_attempts):
+            cursor.execute(
+                """
+                INSERT INTO auth_login_state (username, failed_count, blocked_until, updated_at)
+                VALUES (%s, 0, NOW() + (%s * INTERVAL '1 second'), NOW())
+                ON CONFLICT (username) DO UPDATE SET
+                    failed_count = 0,
+                    blocked_until = NOW() + (%s * INTERVAL '1 second'),
+                    updated_at = NOW()
+                RETURNING blocked_until
+                """,
+                (username, int(lockout_seconds), int(lockout_seconds)),
+            )
+            blocked_until = cursor.fetchone()[0]
+            stored_count = 0
+        else:
+            cursor.execute(
+                """
+                INSERT INTO auth_login_state (username, failed_count, blocked_until, updated_at)
+                VALUES (%s, %s, NULL, NOW())
+                ON CONFLICT (username) DO UPDATE SET
+                    failed_count = EXCLUDED.failed_count,
+                    blocked_until = NULL,
+                    updated_at = NOW()
+                """,
+                (username, failed_count),
+            )
+
+        conn.commit()
+        return stored_count, blocked_until
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def save_password_recovery_state(username, email, codigo, expires_minutes=15):
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO password_recovery_state (username, email, codigo, intentos, expires_at, created_at, updated_at)
+            VALUES (%s, %s, %s, 0, NOW() + (%s * INTERVAL '1 minute'), NOW(), NOW())
+            ON CONFLICT (username) DO UPDATE SET
+                email = EXCLUDED.email,
+                codigo = EXCLUDED.codigo,
+                intentos = 0,
+                expires_at = NOW() + (%s * INTERVAL '1 minute'),
+                updated_at = NOW()
+            """,
+            (username, email, codigo, int(expires_minutes), int(expires_minutes)),
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def get_password_recovery_state(username):
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT email, codigo, intentos, expires_at FROM password_recovery_state WHERE LOWER(username) = LOWER(%s)",
+        (username,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+
+def increment_password_recovery_attempts(username):
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            UPDATE password_recovery_state
+            SET intentos = intentos + 1, updated_at = NOW()
+            WHERE LOWER(username) = LOWER(%s)
+            RETURNING intentos
+            """,
+            (username,),
+        )
+        row = cursor.fetchone()
+        conn.commit()
+        return int(row[0]) if row else None
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def clear_password_recovery_state(username):
+    if not username:
+        return
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM password_recovery_state WHERE LOWER(username) = LOWER(%s)", (username,))
         conn.commit()
     except Exception as e:
         conn.rollback()

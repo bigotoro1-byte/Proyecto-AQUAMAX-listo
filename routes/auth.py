@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, session, current_app
-from database.db import conectar, actualizar_contrasena, registrar_acceso_login, cerrar_acceso_login, cerrar_accesos_activos_usuario
+from database.db import conectar, actualizar_contrasena, registrar_acceso_login, cerrar_acceso_login, cerrar_accesos_activos_usuario, get_auth_login_state, reset_auth_login_state, register_failed_login, save_password_recovery_state, get_password_recovery_state, increment_password_recovery_attempts, clear_password_recovery_state
 from werkzeug.security import check_password_hash, generate_password_hash
 import requests
 import random
@@ -13,7 +13,6 @@ import time
 
 auth_bp = Blueprint("auth", __name__)
 
-FAILED_LOGINS = {}
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_SECONDS = 300
 
@@ -173,12 +172,18 @@ def login():
         if not user or not password:
             return render_template("login.html", error="Completa todos los campos")
 
-        key = (user or "").strip().lower()
-        state = FAILED_LOGINS.get(key, {"count": 0, "until": 0})
         now = time.time()
-        if state.get("until", 0) > now:
-            wait = int(state["until"] - now)
-            return render_template("login.html", error=f"Cuenta bloqueada temporalmente. Intenta en {wait}s")
+        try:
+            auth_state = get_auth_login_state(user)
+        except Exception as e:
+            current_app.logger.error(f"No se pudo consultar estado de login: {str(e)}")
+            auth_state = None
+
+        if auth_state and auth_state[1]:
+            blocked_until_ts = auth_state[1].timestamp()
+            if blocked_until_ts > now:
+                wait = int(blocked_until_ts - now)
+                return render_template("login.html", error=f"Cuenta bloqueada temporalmente. Intenta en {wait}s")
 
         conn = conectar()
         cursor = conn.cursor()
@@ -202,7 +207,10 @@ def login():
                 password_ok = True
 
         if usuario and password_ok:
-            FAILED_LOGINS.pop(key, None)
+            try:
+                reset_auth_login_state(user)
+            except Exception as e:
+                current_app.logger.error(f"No se pudo limpiar estado de login: {str(e)}")
             now_ts = int(time.time())
             session["user"] = usuario[0]
             session["rol"] = usuario[2]
@@ -239,12 +247,11 @@ def login():
                 session["debe_cambiar_password"] = True
             return redirect("/dashboard")
 
-        # Incrementar intentos fallidos
-        state["count"] = state.get("count", 0) + 1
-        if state["count"] >= MAX_LOGIN_ATTEMPTS:
-            state["until"] = now + LOCKOUT_SECONDS
-            state["count"] = 0
-        FAILED_LOGINS[key] = state
+        # Incrementar intentos fallidos en BD
+        try:
+            register_failed_login(user, MAX_LOGIN_ATTEMPTS, LOCKOUT_SECONDS)
+        except Exception as e:
+            current_app.logger.error(f"No se pudo registrar login fallido: {str(e)}")
 
         current_app.logger.warning(f"Login fallido: user={user}, exists={bool(usuario)}")
 
@@ -357,26 +364,21 @@ def recuperar_contrasena():
             codigo = ''.join(random.choices(string.digits, k=6))
             # Enviar email con el código (Brevo principal, SMTP fallback)
             sent, envio_detalle = _send_recovery_email(user, email_registrado, codigo)
-            session['recovery_attempts'] = 0
             if sent:
-                session['recovery_email_failed'] = False
                 session['recovery_user'] = usuario[0]
-                session['recovery_code'] = codigo
-                session['recovery_email'] = email_registrado
-                session['recovery_code_time'] = datetime.now().timestamp()
+                try:
+                    save_password_recovery_state(usuario[0], email_registrado, codigo, 15)
+                except Exception as e:
+                    current_app.logger.error(f'Error guardando recuperacion en BD: {str(e)}')
+                    return render_template('recuperar_contrasena.html', error='No se pudo guardar la solicitud de recuperacion. Intenta nuevamente.', step=1)
                 return render_template('recuperar_contrasena.html', success='Se envio un codigo al correo registrado del usuario', step=2)
 
             session.pop('recovery_user', None)
-            session.pop('recovery_code', None)
-            session.pop('recovery_email', None)
-            session.pop('recovery_code_time', None)
-            session['recovery_email_failed'] = True
-            session['recovery_send_error'] = (envio_detalle or 'No se pudo enviar correo')[:200]
             return render_template(
                 'recuperar_contrasena.html',
                 error='No se pudo enviar correo. Verifica la configuracion de proveedor de correo.',
                 step=1,
-                envio_detalle=session.get('recovery_send_error')
+                envio_detalle=(envio_detalle or 'No se pudo enviar correo')[:200]
             )
 
         elif step == '2':
@@ -385,30 +387,31 @@ def recuperar_contrasena():
             nueva = request.form.get('nueva')
             confirmar = request.form.get('confirmar')
 
-            if not session.get('recovery_user'):
+            recovery_user = session.get('recovery_user')
+            if not recovery_user:
                 return render_template('recuperar_contrasena.html', error='Sesión expirada', step=1)
 
-            ts = session.get('recovery_code_time', 0)
-            if (time.time() - ts) > 900:
+            recovery_state = get_password_recovery_state(recovery_user)
+            if not recovery_state:
                 session.pop('recovery_user', None)
-                session.pop('recovery_code', None)
-                session.pop('recovery_attempts', None)
-                session.pop('recovery_send_error', None)
+                return render_template('recuperar_contrasena.html', error='La solicitud de recuperacion no existe o expiro.', step=1)
+
+            expires_at = recovery_state[3]
+            if not expires_at or expires_at.timestamp() <= time.time():
+                clear_password_recovery_state(recovery_user)
+                session.pop('recovery_user', None)
                 return render_template('recuperar_contrasena.html', error='El codigo expiro. Solicita uno nuevo.', step=1)
 
             if not codigo or not nueva or not confirmar:
                 return render_template('recuperar_contrasena.html', error='Completa todos los campos', step=2)
 
-            codigo_valido = (codigo == session.get('recovery_code'))
+            codigo_valido = (codigo == (recovery_state[1] or ''))
 
             if not codigo_valido:
-                session['recovery_attempts'] = session.get('recovery_attempts', 0) + 1
-                if session['recovery_attempts'] >= 5:
+                intentos = increment_password_recovery_attempts(recovery_user) or 0
+                if intentos >= 5:
+                    clear_password_recovery_state(recovery_user)
                     session.pop('recovery_user', None)
-                    session.pop('recovery_code', None)
-                    session.pop('recovery_attempts', None)
-                    session.pop('recovery_email_failed', None)
-                    session.pop('recovery_send_error', None)
                     return render_template('recuperar_contrasena.html', error='Demasiados intentos. Solicita un nuevo codigo.', step=1)
                 return render_template('recuperar_contrasena.html', error='Código incorrecto', step=2)
 
@@ -420,15 +423,12 @@ def recuperar_contrasena():
 
             # Actualizar contraseña
             try:
-                actualizar_contrasena(session['recovery_user'], generate_password_hash(nueva))
+                actualizar_contrasena(recovery_user, generate_password_hash(nueva))
             except Exception as e:
                 current_app.logger.error(f'Error actualizando contraseña por recuperacion: {str(e)}')
                 return render_template('recuperar_contrasena.html', error='No se pudo actualizar la contraseña. Intenta nuevamente.', step=2)
+            clear_password_recovery_state(recovery_user)
             session.pop('recovery_user', None)
-            session.pop('recovery_code', None)
-            session.pop('recovery_attempts', None)
-            session.pop('recovery_email_failed', None)
-            session.pop('recovery_send_error', None)
 
             return render_template('recuperar_contrasena.html', success='Contraseña actualizada. Ya puedes iniciar sesión', step=1)
 
