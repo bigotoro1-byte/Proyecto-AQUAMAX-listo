@@ -1,4 +1,5 @@
 import os
+import math
 import psycopg2
 import psycopg2.extras
 from psycopg2.pool import ThreadedConnectionPool
@@ -45,6 +46,16 @@ def conectar():
     conn = pool.getconn()
     conn.autocommit = False
     return _PooledConn(conn, pool)
+
+
+def _cantidad_positiva(cantidad):
+    try:
+        valor = float(cantidad)
+    except (TypeError, ValueError):
+        raise ValueError("Cantidad invalida")
+    if not math.isfinite(valor) or valor <= 0:
+        raise ValueError("La cantidad debe ser un numero positivo")
+    return valor
 
 def crear_tablas():
     conn = conectar()
@@ -203,6 +214,7 @@ def get_productos():
     return productos
 
 def insert_inventario(producto, cantidad, piscina, fecha, usuario):
+    cantidad = _cantidad_positiva(cantidad)
     conn = conectar()
     cursor = conn.cursor()
     try:
@@ -364,6 +376,7 @@ def get_configuracion_stock_producto_map_por_nombre():
 
 
 def insert_movimiento(producto, tipo, cantidad, ubicacion, fecha, usuario):
+    cantidad = _cantidad_positiva(cantidad)
     conn = conectar()
     cursor = conn.cursor()
     try:
@@ -449,6 +462,7 @@ def delete_ubicacion(nombre):
         conn.close()
 
 def descontar_stock(producto, cantidad, usuario=None):
+    cantidad = _cantidad_positiva(cantidad)
     conn = conectar()
     cursor = conn.cursor()
     try:

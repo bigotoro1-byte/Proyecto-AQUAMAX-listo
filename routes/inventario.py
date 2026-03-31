@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, session, redirect, flash
 from database.db import conectar, get_productos, insert_inventario, get_inventario, get_stock_actual, get_stock_general_por_producto, get_configuracion_stock, get_configuracion_stock_producto_map_por_nombre, descontar_stock, insert_movimiento, get_movimientos_salida, get_ubicaciones
 from datetime import datetime
+import math
 from routes.utils import login_required
 from flask_wtf import FlaskForm
 from wtforms import StringField, FloatField, SelectField
@@ -36,7 +37,17 @@ def inventario():
         cantidad = entrada_form.cantidad.data
         usuario = session.get('user')
 
-        if cantidad is None or float(cantidad) < cfg['min_cantidad_entrada']:
+        try:
+            cantidad = float(cantidad)
+        except (TypeError, ValueError):
+            flash('Cantidad invalida. Ingresa un numero valido.', 'error')
+            return redirect('/inventario')
+
+        if not math.isfinite(cantidad) or cantidad <= 0:
+            flash('Cantidad invalida. Debe ser mayor que 0.', 'error')
+            return redirect('/inventario')
+
+        if cantidad < cfg['min_cantidad_entrada']:
             flash(f'Cantidad invalida. Minimo permitido para entrada: {cfg["min_cantidad_entrada"]}', 'error')
             return redirect('/inventario')
 
@@ -94,7 +105,17 @@ def salida():
         ubicacion = salida_form.ubicacion.data
         usuario = session.get('user')
 
-        if cantidad is None or float(cantidad) < cfg['min_cantidad_salida']:
+        try:
+            cantidad = float(cantidad)
+        except (TypeError, ValueError):
+            flash('Cantidad invalida. Ingresa un numero valido.', 'error')
+            return redirect('/inventario')
+
+        if not math.isfinite(cantidad) or cantidad <= 0:
+            flash('Cantidad invalida. Debe ser mayor que 0.', 'error')
+            return redirect('/inventario')
+
+        if cantidad < cfg['min_cantidad_salida']:
             flash(f'Cantidad invalida. Minimo permitido para salida: {cfg["min_cantidad_salida"]}', 'error')
             return redirect('/inventario')
 
