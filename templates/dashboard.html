@@ -66,6 +66,44 @@
 
 </div>
 
+<!-- 🚨 DETALLE DE ALERTAS -->
+<div class="row g-4 mt-1">
+<div class="col-12">
+<div class="card shadow p-4">
+
+<h6 class="mb-3">Alertas generadas</h6>
+
+{% if alertas and alertas|length > 0 %}
+<div class="table-responsive">
+<table class="table table-sm align-middle mb-0">
+<thead>
+<tr>
+<th>Producto</th>
+<th class="text-end">Stock actual</th>
+<th class="text-end">Estado</th>
+</tr>
+</thead>
+<tbody>
+{% for p, c in alertas %}
+<tr>
+<td>{{ p }}</td>
+<td class="text-end">{{ c }}</td>
+<td class="text-end"><span class="badge bg-danger">Bajo</span></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<div class="alert alert-success mb-0">
+No hay alertas activas por stock bajo.
+</div>
+{% endif %}
+
+</div>
+</div>
+</div>
+
 <!-- 📊 SCRIPT -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
