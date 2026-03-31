@@ -63,12 +63,12 @@ def inventario():
     stock_actual = get_stock_actual()
     umbrales_por_producto = get_configuracion_stock_producto_map_por_nombre()
     stock_general_map = get_stock_general_por_producto()
-    if session.get('rol') == 'admin':
+    if session.get('rol') in ('admin', 'superadmin'):
         retiros = get_movimientos_salida(10)
     else:
         retiros = get_movimientos_salida(10, session.get('user'))
 
-    if session.get('rol') == 'admin':
+    if session.get('rol') in ('admin', 'superadmin'):
         datos = get_inventario()
     else:
         datos = get_inventario(session['user'])
