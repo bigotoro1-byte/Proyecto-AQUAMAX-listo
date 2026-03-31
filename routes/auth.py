@@ -203,8 +203,12 @@ def login():
 
         if usuario and password_ok:
             FAILED_LOGINS.pop(key, None)
+            now_ts = int(time.time())
             session["user"] = usuario[0]
             session["rol"] = usuario[2]
+            session["login_at_ts"] = now_ts
+            session["last_activity_ts"] = now_ts
+            session.permanent = True
 
             # Auditoria: registrar ingreso exitoso
             ip = (

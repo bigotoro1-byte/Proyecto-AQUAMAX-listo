@@ -63,6 +63,28 @@ body {
     color: #38bdf8;
 }
 
+.session-box {
+    margin-top: 14px;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.session-box .label {
+    font-size: 11px;
+    color: #cbd5e1;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.session-box .value {
+    font-size: 13px;
+    color: #f8fafc;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
 /* =========================
    CONTENIDO
 ========================= */
@@ -260,6 +282,16 @@ body.loading {
 
         <a href="/cambiar_contrasena">🔑 Cambiar clave</a>
         <a href="/logout">🚪 Salir</a>
+
+        <div class="session-box" id="sessionBox"
+             data-login-ts="{{ session_login_ts or '' }}"
+             data-last-activity-ts="{{ session_last_activity_ts or '' }}"
+             data-timeout-seconds="{{ session_timeout_seconds or 1800 }}">
+            <div class="label">Tiempo en la app</div>
+            <div class="value" id="sessionElapsed">--:--:--</div>
+            <div class="label">Cierre automatico en</div>
+            <div class="value" id="sessionRemaining">--:--</div>
+        </div>
     </div>
     {% endif %}
 
@@ -360,6 +392,60 @@ document.addEventListener("DOMContentLoaded", function () {
         const msg = form.dataset.loadingText || "Procesando solicitud...";
         showLoading(msg);
     });
+})();
+
+(function () {
+    const box = document.getElementById("sessionBox");
+    if (!box) return;
+
+    const elapsedEl = document.getElementById("sessionElapsed");
+    const remainingEl = document.getElementById("sessionRemaining");
+    const loginTs = parseInt(box.dataset.loginTs || "0", 10);
+    let lastActivityTs = parseInt(box.dataset.lastActivityTs || "0", 10);
+    const timeoutSeconds = parseInt(box.dataset.timeoutSeconds || "1800", 10);
+
+    function pad(n) {
+        return String(n).padStart(2, "0");
+    }
+
+    function formatHMS(total) {
+        const h = Math.floor(total / 3600);
+        const m = Math.floor((total % 3600) / 60);
+        const s = total % 60;
+        return `${pad(h)}:${pad(m)}:${pad(s)}`;
+    }
+
+    function formatMS(total) {
+        const m = Math.floor(total / 60);
+        const s = total % 60;
+        return `${pad(m)}:${pad(s)}`;
+    }
+
+    function tick() {
+        const now = Math.floor(Date.now() / 1000);
+
+        if (loginTs > 0 && elapsedEl) {
+            const elapsed = Math.max(0, now - loginTs);
+            elapsedEl.textContent = formatHMS(elapsed);
+        }
+
+        if (lastActivityTs > 0 && remainingEl) {
+            const remaining = Math.max(0, timeoutSeconds - (now - lastActivityTs));
+            remainingEl.textContent = formatMS(remaining);
+            if (remaining <= 0) {
+                window.location.href = "/login";
+            }
+        }
+    }
+
+    // Si hay interacción local, mantiene el contador de frontend alineado
+    // con la renovación por actividad que hace el backend en cada request.
+    document.addEventListener("click", function () {
+        lastActivityTs = Math.floor(Date.now() / 1000);
+    });
+
+    setInterval(tick, 1000);
+    tick();
 })();
 </script>
 

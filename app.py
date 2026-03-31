@@ -1,9 +1,11 @@
-from flask import Flask
+from flask import Flask, session, redirect, flash
 from flask_wtf.csrf import CSRFProtect
 from flask_mail import Mail
 from database.db import crear_tablas, actualizar_tabla, insert_usuario, get_usuario
 from werkzeug.security import generate_password_hash
 import os
+import time
+from datetime import timedelta
 from dotenv import load_dotenv
 
 from routes.auth import auth_bp
@@ -20,6 +22,13 @@ secret_key = os.getenv('SECRET_KEY')
 if not secret_key:
     raise RuntimeError('SECRET_KEY no está configurado en .env. Define SECRET_KEY y reinicia la aplicación.')
 app.secret_key = secret_key
+
+# Cierre automatico de sesion por inactividad (minutos)
+session_timeout_minutes = int(os.getenv('SESSION_TIMEOUT_MINUTES', '30'))
+if session_timeout_minutes < 5:
+    session_timeout_minutes = 5
+app.config['SESSION_TIMEOUT_SECONDS'] = session_timeout_minutes * 60
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(seconds=app.config['SESSION_TIMEOUT_SECONDS'])
 
 # Habilitar CSRF (requerido) y evitar evaluación insegura
 app.config['WTF_CSRF_ENABLED'] = True
@@ -38,6 +47,34 @@ app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_FROM', 'aquamax@tuempresa.co
 app.config['MAIL_ASCII_ATTACHMENTS'] = False
 
 mail = Mail(app)
+
+
+@app.before_request
+def controlar_sesion_por_inactividad():
+    if not session.get('user'):
+        return None
+
+    now_ts = int(time.time())
+    last_activity = session.get('last_activity_ts')
+    timeout_seconds = int(app.config.get('SESSION_TIMEOUT_SECONDS', 1800))
+
+    if last_activity and (now_ts - int(last_activity)) > timeout_seconds:
+        session.clear()
+        flash('Tu sesion caduco por inactividad. Inicia sesion nuevamente.', 'error')
+        return redirect('/login')
+
+    session['last_activity_ts'] = now_ts
+    session.modified = True
+    return None
+
+
+@app.context_processor
+def inyectar_datos_sesion():
+    return {
+        'session_timeout_seconds': int(app.config.get('SESSION_TIMEOUT_SECONDS', 1800)),
+        'session_login_ts': session.get('login_at_ts'),
+        'session_last_activity_ts': session.get('last_activity_ts'),
+    }
 
 # 🔌 DB
 crear_tablas()
