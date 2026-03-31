@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, session, flash
-from database.db import conectar, get_db_path, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto
+from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 import os
@@ -80,12 +80,10 @@ def eliminar_usuario(user):
 
 
 def _crear_respaldo_db():
-    db_path = get_db_path()
-    os.makedirs("backups", exist_ok=True)
+    # Con PostgreSQL el backup de archivo local no aplica.
+    # El respaldo se gestiona desde el panel de Render (PostgreSQL Backups).
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = os.path.join("backups", f"inventario_backup_{stamp}.db")
-    shutil.copy2(db_path, backup_path)
-    return backup_path
+    return f"backup_postgres_{stamp} (gestionado por Render)"
 
 
 @usuarios_bp.route("/sistema", methods=["GET", "POST"])
