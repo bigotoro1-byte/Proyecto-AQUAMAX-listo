@@ -1,12 +1,59 @@
-from flask import Blueprint, render_template, request, redirect, session, flash
+from flask import Blueprint, render_template, request, redirect, session, flash, send_file
 from database.db import conectar, get_configuracion_stock, set_configuracion_stock, get_configuracion_stock_productos_en_stock, set_configuracion_stock_producto, get_ubicaciones, add_ubicacion, delete_ubicacion, get_accesos_login
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 import os
 import shutil
 import re
+import io
+from openpyxl import Workbook
 
 usuarios_bp = Blueprint("usuarios", __name__, url_prefix="/admin")
+
+
+def _append_table_sheet(cursor, wb, table_name):
+    ws = wb.create_sheet(title=table_name[:31])
+    cursor.execute(f"SELECT * FROM {table_name}")
+    rows = cursor.fetchall()
+    headers = [desc[0] for desc in (cursor.description or [])]
+
+    if headers:
+        ws.append(headers)
+
+    for row in rows:
+        ws.append(list(row))
+
+
+def _generar_excel_db():
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        wb = Workbook()
+        # Elimina la hoja por defecto para dejar solo tablas reales.
+        wb.remove(wb.active)
+
+        tablas = [
+            "usuarios",
+            "productos",
+            "inventario",
+            "movimientos",
+            "configuracion",
+            "configuracion_producto",
+            "ubicaciones",
+            "accesos_login",
+            "auth_login_state",
+            "password_recovery_state",
+        ]
+
+        for tabla in tablas:
+            _append_table_sheet(cursor, wb, tabla)
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output
+    finally:
+        conn.close()
 
 
 def password_es_fuerte(password):
@@ -131,6 +178,26 @@ def _crear_respaldo_db():
     # El respaldo se gestiona desde el panel de Render (PostgreSQL Backups).
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return f"backup_postgres_{stamp} (gestionado por Render)"
+
+
+@usuarios_bp.route("/exportar-db-xlsx", methods=["GET"])
+def exportar_db_xlsx():
+    if "rol" not in session or session["rol"] != "superadmin":
+        return render_template("acceso_denegado.html"), 403
+
+    try:
+        excel_buffer = _generar_excel_db()
+    except Exception as e:
+        flash(f"No se pudo generar el archivo Excel: {str(e)}", "error")
+        return redirect("/admin/sistema")
+
+    nombre = f"aquamax_db_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return send_file(
+        excel_buffer,
+        as_attachment=True,
+        download_name=nombre,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @usuarios_bp.route("/sistema", methods=["GET", "POST"])
