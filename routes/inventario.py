@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, session, redirect, flash
-from database.db import conectar, get_productos, insert_inventario, get_inventario, get_stock_actual, get_stock_general_por_producto, get_configuracion_stock, get_configuracion_stock_producto_map_por_nombre, descontar_stock, insert_movimiento, get_movimientos_salida, get_ubicaciones
+from database.db import conectar, get_productos, insert_inventario, get_inventario, get_stock_actual, get_stock_general_por_producto, get_configuracion_stock, get_configuracion_stock_producto_map_por_nombre, descontar_stock, insert_movimiento, get_movimientos_salida, get_ubicaciones, registrar_accion_admin
 from datetime import datetime
 import math
 from routes.utils import login_required
@@ -54,8 +54,24 @@ def inventario():
         try:
             insert_inventario(producto_id, cantidad, 'GENERAL', datetime.now().strftime('%Y-%m-%d %H:%M:%S'), usuario)
             insert_movimiento(producto_id, 'ENTRADA', cantidad, 'GENERAL', datetime.now().strftime('%Y-%m-%d %H:%M:%S'), usuario)
+            registrar_accion_admin(
+                accion='agregar_stock',
+                username=session.get('user', 'desconocido'),
+                estado='ok',
+                detalle=f'Producto: {producto_id}, Cantidad: {cantidad}',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')
+            )
             flash('Entrada registrada exitosamente', 'success')
         except Exception as e:
+            registrar_accion_admin(
+                accion='agregar_stock',
+                username=session.get('user', 'desconocido'),
+                estado='error',
+                detalle=str(e)[:220],
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')
+            )
             flash(f'Error al registrar entrada: {str(e)}', 'error')
 
         return redirect('/inventario')
@@ -135,8 +151,24 @@ def salida():
         try:
             descontar_stock(producto_id, cantidad, usuario)
             insert_movimiento(producto_id, 'SALIDA', cantidad, ubicacion, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), usuario)
+            registrar_accion_admin(
+                accion='retirar_stock',
+                username=session.get('user', 'desconocido'),
+                estado='ok',
+                detalle=f'Producto: {producto_id}, Cantidad: {cantidad}, Destino: {ubicacion}',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')
+            )
             flash(f'Salida registrada exitosamente (destino: {ubicacion})', 'success')
         except Exception as e:
+            registrar_accion_admin(
+                accion='retirar_stock',
+                username=session.get('user', 'desconocido'),
+                estado='error',
+                detalle=str(e)[:220],
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')
+            )
             flash(f'Error al registrar salida: {str(e)}', 'error')
 
     return redirect('/inventario')

@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, session, redirect, flash
-from database.db import conectar
+from database.db import conectar, registrar_accion_admin
 from datetime import datetime
 import uuid
 
@@ -45,6 +45,14 @@ def productos():
 
             if existe_nombre:
                 mensaje = "❌ Ya existe un producto con ese nombre"
+                registrar_accion_admin(
+                    accion='crear_producto',
+                    username=session.get('user', 'desconocido'),
+                    estado='error',
+                    detalle=f'Producto duplicado: {producto}',
+                    ip_address=request.remote_addr,
+                    user_agent=request.headers.get('User-Agent', '')
+                )
             else:
                 codigo_generado = generar_codigo_producto(cursor)
                 cursor.execute(
@@ -52,6 +60,14 @@ def productos():
                     (codigo_generado, producto, tipo, fecha, usuario)
                 )
                 conn.commit()
+                registrar_accion_admin(
+                    accion='crear_producto',
+                    username=session.get('user', 'desconocido'),
+                    estado='ok',
+                    detalle=f'Producto: {producto}, Codigo: {codigo_generado}, Tipo: {tipo or "-"}',
+                    ip_address=request.remote_addr,
+                    user_agent=request.headers.get('User-Agent', '')
+                )
                 flash(f"Producto agregado con código {codigo_generado}", "success")
                 conn.close()
                 return redirect("/productos")

@@ -222,9 +222,25 @@ def actualizar_email_usuario(user):
 
         cursor.execute("UPDATE usuarios SET email=%s WHERE username=%s", (nuevo_email, user))
         conn.commit()
+        registrar_accion_admin(
+            accion='actualizar_email_usuario',
+            username=session.get('user', 'desconocido'),
+            estado='ok',
+            detalle=f'Usuario: {user}, Nuevo email: {nuevo_email}',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
         flash("Correo actualizado correctamente", "success")
     except Exception as e:
         conn.rollback()
+        registrar_accion_admin(
+            accion='actualizar_email_usuario',
+            username=session.get('user', 'desconocido'),
+            estado='error',
+            detalle=str(e)[:220],
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
         flash(f"No se pudo actualizar el correo: {str(e)}", "error")
     finally:
         conn.close()
@@ -527,6 +543,14 @@ def ajustes_stock():
 
             set_configuracion_stock_producto(pid, p_critico, p_medio, p_alerta)
 
+        registrar_accion_admin(
+            accion='actualizar_ajustes_stock',
+            username=session.get('user', 'desconocido'),
+            estado='ok',
+            detalle=f'Min entrada: {min_entrada}, Min salida: {min_salida}, Umbral critico: {umbral_critico}, Umbral medio: {umbral_medio}, Alerta dashboard: {umbral_alerta_dashboard}',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
         flash("Ajustes de stock actualizados correctamente.", "success")
         return redirect("/admin/ajustes-stock")
 
@@ -554,8 +578,24 @@ def ubicaciones_admin():
                 return redirect("/admin/ubicaciones")
 
             add_ubicacion(nombre)
+            registrar_accion_admin(
+                accion='agregar_ubicacion',
+                username=session.get('user', 'desconocido'),
+                estado='ok',
+                detalle=f'Ubicacion: {nombre}',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')
+            )
             flash("Ubicacion agregada correctamente", "success")
         except Exception as e:
+            registrar_accion_admin(
+                accion='agregar_ubicacion',
+                username=session.get('user', 'desconocido'),
+                estado='error',
+                detalle=str(e)[:220],
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')
+            )
             flash(f"No se pudo agregar la ubicacion: {str(e)}", "error")
 
         return redirect("/admin/ubicaciones")
@@ -570,8 +610,24 @@ def eliminar_ubicacion(nombre):
 
     try:
         delete_ubicacion(nombre)
+        registrar_accion_admin(
+            accion='eliminar_ubicacion',
+            username=session.get('user', 'desconocido'),
+            estado='ok',
+            detalle=f'Ubicacion: {nombre}',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
         flash("Ubicacion eliminada", "success")
     except Exception as e:
+        registrar_accion_admin(
+            accion='eliminar_ubicacion',
+            username=session.get('user', 'desconocido'),
+            estado='error',
+            detalle=str(e)[:220],
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
         flash(f"No se pudo eliminar la ubicacion: {str(e)}", "error")
 
     return redirect("/admin/ubicaciones")
