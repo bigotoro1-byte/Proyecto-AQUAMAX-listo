@@ -26,9 +26,32 @@
     <div class="card p-4">
         <h5>Reiniciar datos del sistema</h5>
         <p class="text-muted">Reinicio integral: limpia inventario, productos, retiros/movimientos, reportes, ingresos, salud y auditoria. Mantiene admin/superadmin, configuraciones y ubicaciones.</p>
-        <div class="alert alert-warning py-2 px-3 small">
-            Antes de reiniciar, debes haber descargado un respaldo .xlsx reciente (maximo 2 horas).
+
+        {% if respaldo_info.existe %}
+            {% if respaldo_info.vigente %}
+            <div class="alert alert-success py-2 px-3 small">
+                <b>Respaldo valido:</b> SI
+                <br>
+                Ultimo .xlsx: {{ fmt_dt_co(respaldo_info.created_at) }} (hace {{ respaldo_info.edad_minutos }} min)
+                {% if respaldo_info.detalle %}<br>Detalle: {{ respaldo_info.detalle }}{% endif %}
+            </div>
+            {% else %}
+            <div class="alert alert-danger py-2 px-3 small">
+                <b>Respaldo valido:</b> NO
+                <br>
+                Ultimo .xlsx: {{ fmt_dt_co(respaldo_info.created_at) }} (hace {{ respaldo_info.edad_minutos }} min)
+                <br>
+                Debes descargar un respaldo nuevo (maximo 2 horas) antes de reiniciar.
+            </div>
+            {% endif %}
+        {% else %}
+        <div class="alert alert-danger py-2 px-3 small">
+            <b>Respaldo valido:</b> NO
+            <br>
+            Aun no existe un respaldo .xlsx registrado. Descarga uno antes de reiniciar.
         </div>
+        {% endif %}
+
         <form method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="reiniciar_datos">

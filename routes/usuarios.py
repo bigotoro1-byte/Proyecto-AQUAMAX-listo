@@ -428,7 +428,46 @@ def sistema():
 
         return redirect("/admin/sistema")
 
-    return render_template("sistema.html")
+    respaldo_info = {
+        "existe": False,
+        "vigente": False,
+        "created_at": None,
+        "detalle": None,
+        "edad_minutos": None,
+    }
+    conn = None
+    try:
+        conn = conectar()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT
+                created_at,
+                detalle,
+                (created_at >= NOW() - INTERVAL '2 hours') AS vigente,
+                EXTRACT(EPOCH FROM (NOW() - created_at)) / 60.0 AS edad_minutos
+            FROM system_events
+            WHERE evento = 'export_db_xlsx' AND estado = 'ok'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+        if row:
+            respaldo_info = {
+                "existe": True,
+                "vigente": bool(row[2]),
+                "created_at": row[0],
+                "detalle": row[1],
+                "edad_minutos": int(float(row[3] or 0)),
+            }
+    except Exception:
+        pass
+    finally:
+        if conn:
+            conn.close()
+
+    return render_template("sistema.html", respaldo_info=respaldo_info)
 
 
 @usuarios_bp.route("/ajustes-stock", methods=["GET", "POST"])
