@@ -30,8 +30,11 @@
     {{ entrada_form.hidden_tag() }}
 
     <div class="mb-3">
+        <label for="buscar-producto-entrada" class="form-label">Buscar producto</label>
+        <input type="text" id="buscar-producto-entrada" class="form-control mb-2" placeholder="Escribe para filtrar...">
+
         {{ entrada_form.producto.label(class="form-label") }}
-        {{ entrada_form.producto(class="form-select") }}
+        {{ entrada_form.producto(class="form-select", id="entrada-producto-select") }}
         {% if entrada_form.producto.errors %}
             <div class="text-danger small">
                 {% for error in entrada_form.producto.errors %}{{ error }}{% endfor %}
@@ -211,6 +214,8 @@ Ahora tu sistema muestra:
 
 <script>
 const stockGeneralMap = {{ stock_general_map|tojson }};
+const entradaProductoSelect = document.getElementById("entrada-producto-select");
+const buscarProductoEntradaInput = document.getElementById("buscar-producto-entrada");
 const productoSelect = document.getElementById("salida-producto-select");
 const buscarProductoInput = document.getElementById("buscar-producto-salida");
 const stockInfo = document.getElementById("stock-disponible-general");
@@ -250,6 +255,42 @@ function filtrarProductosSalida() {
     }
 
     actualizarStockDisponible();
+}
+
+function filtrarProductosEntrada() {
+    if (!entradaProductoSelect || !buscarProductoEntradaInput || !entradaProductoSelect._allOptions) return;
+
+    const filtro = (buscarProductoEntradaInput.value || "").toLowerCase().trim();
+    const opcionesOriginales = entradaProductoSelect._allOptions;
+    const seleccionadoActual = entradaProductoSelect.value;
+
+    entradaProductoSelect.innerHTML = "";
+
+    const opcionesFiltradas = opcionesOriginales.filter((opt) => {
+        const texto = (opt.text || "").toLowerCase();
+        const valor = (opt.value || "").toLowerCase();
+        return !filtro || texto.includes(filtro) || valor.includes(filtro);
+    });
+
+    opcionesFiltradas.forEach((opt) => {
+        entradaProductoSelect.appendChild(opt.cloneNode(true));
+    });
+
+    if (opcionesFiltradas.length === 0) {
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = "Sin coincidencias";
+        entradaProductoSelect.appendChild(empty);
+    } else if (opcionesFiltradas.some((opt) => opt.value === seleccionadoActual)) {
+        entradaProductoSelect.value = seleccionadoActual;
+    }
+}
+
+if (entradaProductoSelect) {
+    entradaProductoSelect._allOptions = Array.from(entradaProductoSelect.options).map((opt) => opt.cloneNode(true));
+    if (buscarProductoEntradaInput) {
+        buscarProductoEntradaInput.addEventListener("input", filtrarProductosEntrada);
+    }
 }
 
 if (productoSelect && stockInfo) {
