@@ -527,7 +527,8 @@ document.addEventListener("DOMContentLoaded", function () {
             const remaining = Math.max(0, timeoutSeconds - (now - lastActivityTs));
             remainingEl.textContent = formatMS(remaining);
             if (remaining <= 0) {
-                window.location.href = "/login";
+                // Usar /logout garantiza que se cierre el acceso en BD antes de ir a login.
+                window.location.href = "/logout";
             }
         }
     }
