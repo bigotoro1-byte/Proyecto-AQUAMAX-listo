@@ -13,6 +13,75 @@ def generar_codigo_producto(cursor):
         if not cursor.fetchone():
             return codigo
 
+
+@productos_bp.route("/productos/editar-nombre/<producto_id>", methods=["POST"])
+def editar_nombre_producto(producto_id):
+
+    if session.get("rol") != "superadmin":
+        return render_template("acceso_denegado.html"), 403
+
+    nuevo_nombre = (request.form.get("nuevo_nombre") or "").strip()
+    if not nuevo_nombre:
+        flash("Debes ingresar un nombre valido para el producto.", "error")
+        return redirect("/productos")
+
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT nombre FROM productos WHERE id = %s", (producto_id,))
+        row = cursor.fetchone()
+        if not row:
+            flash("Producto no encontrado.", "error")
+            return redirect("/productos")
+
+        nombre_actual = (row[0] or "").strip()
+        if nombre_actual.lower() == nuevo_nombre.lower():
+            flash("El nuevo nombre es igual al actual.", "error")
+            return redirect("/productos")
+
+        cursor.execute(
+            "SELECT 1 FROM productos WHERE UPPER(TRIM(nombre)) = UPPER(TRIM(%s)) AND id <> %s",
+            (nuevo_nombre, producto_id)
+        )
+        if cursor.fetchone():
+            flash("Ya existe otro producto con ese nombre.", "error")
+            registrar_accion_admin(
+                accion='editar_nombre_producto',
+                username=session.get('user', 'desconocido'),
+                estado='error',
+                detalle=f'Intento duplicado. Producto: {producto_id}, Nombre: {nuevo_nombre}',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')
+            )
+            return redirect("/productos")
+
+        cursor.execute("UPDATE productos SET nombre = %s WHERE id = %s", (nuevo_nombre, producto_id))
+        conn.commit()
+        registrar_accion_admin(
+            accion='editar_nombre_producto',
+            username=session.get('user', 'desconocido'),
+            estado='ok',
+            detalle=f'Producto: {producto_id}, Antes: {nombre_actual}, Ahora: {nuevo_nombre}',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+        flash("Nombre del producto actualizado correctamente.", "success")
+    except Exception as e:
+        conn.rollback()
+        registrar_accion_admin(
+            accion='editar_nombre_producto',
+            username=session.get('user', 'desconocido'),
+            estado='error',
+            detalle=str(e)[:220],
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+        flash(f"No se pudo actualizar el nombre del producto: {str(e)}", "error")
+    finally:
+        conn.close()
+
+    return redirect("/productos")
+
 @productos_bp.route("/productos", methods=["GET", "POST"])
 def productos():
 

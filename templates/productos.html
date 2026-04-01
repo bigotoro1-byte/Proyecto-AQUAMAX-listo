@@ -54,6 +54,9 @@
 <th>Tipo</th>
 <th>Fecha</th>
 <th>Usuario</th>
+{% if session.get("rol") == "superadmin" %}
+<th>Acción</th>
+{% endif %}
 </tr>
 </thead>
 
@@ -61,10 +64,23 @@
 {% for d in datos %}
 <tr>
 <td>{{d[0]}}</td>
-<td>{{d[1]}}</td>
+<td>
+{% if session.get("rol") == "superadmin" %}
+<form method="post" action="/productos/editar-nombre/{{ d[0] }}" class="d-flex flex-column flex-md-row gap-2 align-items-start align-items-md-center mb-0">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<input name="nuevo_nombre" class="form-control form-control-sm" value="{{ d[1] }}" maxlength="120" required>
+<button class="btn btn-sm btn-outline-primary" type="submit">Guardar</button>
+</form>
+{% else %}
+{{ d[1] }}
+{% endif %}
+</td>
 <td>{{d[2]}}</td>
 <td>{{d[3] if d|length > 3 else ''}}</td>
 <td>{{d[4] if d|length > 4 else ''}}</td>
+{% if session.get("rol") == "superadmin" %}
+<td><small class="text-muted">Solo superadmin puede corregir nombres</small></td>
+{% endif %}
 </tr>
 {% endfor %}
 </tbody>
