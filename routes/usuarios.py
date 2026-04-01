@@ -356,6 +356,41 @@ def sistema():
                     flash("Confirmacion invalida. Escribe REINICIAR.", "error")
                     return redirect("/admin/sistema")
 
+                # Seguridad operativa: exigir respaldo .xlsx reciente antes de reiniciar.
+                cursor.execute(
+                    """
+                    SELECT created_at, detalle
+                    FROM system_events
+                    WHERE evento = 'export_db_xlsx' AND estado = 'ok'
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """
+                )
+                ultimo_backup = cursor.fetchone()
+                if not ultimo_backup:
+                    flash(
+                        "Antes de reiniciar debes generar y descargar un respaldo .xlsx desde este panel.",
+                        "error"
+                    )
+                    return redirect("/admin/sistema")
+
+                cursor.execute(
+                    """
+                    SELECT 1
+                    FROM system_events
+                    WHERE evento = 'export_db_xlsx'
+                      AND estado = 'ok'
+                      AND created_at >= NOW() - INTERVAL '2 hours'
+                    LIMIT 1
+                    """
+                )
+                if not cursor.fetchone():
+                    flash(
+                        "El ultimo respaldo .xlsx es antiguo. Descarga uno nuevo antes de reiniciar.",
+                        "error"
+                    )
+                    return redirect("/admin/sistema")
+
                 # Reinicio integral de datos operativos e historicos.
                 # Mantiene: usuarios admin/superadmin, configuraciones y ubicaciones.
                 cursor.execute(
@@ -378,7 +413,7 @@ def sistema():
                 conn.commit()
                 flash(
                     "Sistema reiniciado correctamente: inventario, retiros, reportes, ingresos, salud y auditoria fueron limpiados. "
-                    f"Respaldo: {backup_path}",
+                    f"Respaldo validado: {ultimo_backup[1] or backup_path}",
                     "success"
                 )
 
