@@ -390,7 +390,7 @@ body.loading {
                 {% for category, message in messages %}
                     <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
                         {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
                     </div>
                 {% endfor %}
             {% endif %}
@@ -437,6 +437,19 @@ document.addEventListener("DOMContentLoaded", function () {
     sidebarLinks.forEach(function (link) {
         link.addEventListener("click", function () {
             closeMenu();
+        });
+    });
+
+    // Fallback para cerrar alertas flash cuando Bootstrap JS no gestiona data-bs-dismiss.
+    document.querySelectorAll('.alert .btn-close').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const alert = btn.closest('.alert');
+            if (alert) {
+                alert.classList.remove('show');
+                setTimeout(function () {
+                    alert.remove();
+                }, 120);
+            }
         });
     });
 });
