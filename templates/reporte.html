@@ -19,7 +19,7 @@
 <!-- HEADER -->
 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-3">
     <h2 class="reporte-title">📄 Reporte de Inventario</h2>
-    <a href="/reporte/pdf?producto={{request.args.get('producto','')}}&ubicacion={{request.args.get('ubicacion','')}}" class="btn btn-danger">
+    <a href="/reporte/pdf?producto={{request.args.get('producto','')}}&ubicacion={{request.args.get('ubicacion','')}}" class="btn btn-danger" data-no-loading="true">
         📥 Descargar PDF
     </a>
 </div>

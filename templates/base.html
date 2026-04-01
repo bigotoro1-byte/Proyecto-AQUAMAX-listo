@@ -470,7 +470,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
         if (link.getAttribute("target") === "_blank") return;
         if (link.hasAttribute("download")) return;
-        if (href.includes("exportar-db-xlsx") || href.toLowerCase().endsWith(".xlsx")) return;
+        if (href.includes("exportar-db-xlsx") || href.toLowerCase().endsWith(".xlsx") || href.includes("/reporte/pdf") || href.toLowerCase().endsWith(".pdf")) return;
 
         const msg = link.dataset.loadingText || "Cargando...";
         showLoading(msg);
