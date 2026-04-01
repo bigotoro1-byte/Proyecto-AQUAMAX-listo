@@ -356,19 +356,31 @@ def sistema():
                     flash("Confirmacion invalida. Escribe REINICIAR.", "error")
                     return redirect("/admin/sistema")
 
-                cursor.execute("DELETE FROM inventario")
-                cursor.execute("DELETE FROM productos")
+                # Reinicio integral de datos operativos e historicos.
+                # Mantiene: usuarios admin/superadmin, configuraciones y ubicaciones.
+                cursor.execute(
+                    """
+                    TRUNCATE TABLE
+                        movimientos,
+                        inventario,
+                        productos,
+                        accesos_login,
+                        auth_login_state,
+                        password_recovery_state,
+                        email_envios_log,
+                        system_events,
+                        session_revocations,
+                        acceso_revocations
+                    RESTART IDENTITY
+                    """
+                )
                 cursor.execute("DELETE FROM usuarios WHERE rol NOT IN ('admin', 'superadmin')")
                 conn.commit()
-                registrar_accion_admin(
-                    accion='reiniciar_datos',
-                    username=session.get('user', 'desconocido'),
-                    estado='ok',
-                    detalle=f'Datos del sistema reiniciados. Respaldo: {backup_path}',
-                    ip_address=request.remote_addr,
-                    user_agent=request.headers.get('User-Agent', '')
+                flash(
+                    "Sistema reiniciado correctamente: inventario, retiros, reportes, ingresos, salud y auditoria fueron limpiados. "
+                    f"Respaldo: {backup_path}",
+                    "success"
                 )
-                flash(f"Datos reiniciados correctamente. Respaldo: {backup_path}", "success")
 
             else:
                 flash("Accion no valida", "error")
