@@ -47,8 +47,8 @@
                         <tr>
                             <td class="fw-semibold">{{ a[1] }}</td>
                             <td>{{ a[2] or '-' }}</td>
-                            <td>{{ a[5] }}</td>
-                            <td>{{ a[6] or '-' }}</td>
+                            <td>{{ fmt_dt_co(a[5]) }}</td>
+                            <td>{{ fmt_dt_co(a[6]) if a[6] else '-' }}</td>
                             <td>
                                 {% set total = a[7] or 0 %}
                                 {% set h = (total // 3600)|int %}

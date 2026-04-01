@@ -7,6 +7,8 @@ import os
 import time
 from datetime import timedelta
 from dotenv import load_dotenv
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from routes.auth import auth_bp
 from routes.dashboard import dashboard_bp
@@ -111,10 +113,39 @@ def controlar_sesion_por_inactividad():
 
 @app.context_processor
 def inyectar_datos_sesion():
+    tz_co = ZoneInfo('America/Bogota')
+
+    def fmt_dt_co(value):
+        if not value:
+            return '-'
+        try:
+            if isinstance(value, datetime):
+                dt = value
+            else:
+                txt = str(value).strip()
+                dt = None
+                try:
+                    dt = datetime.fromisoformat(txt)
+                except ValueError:
+                    pass
+                if dt is None:
+                    try:
+                        dt = datetime.strptime(txt, '%Y-%m-%d %H:%M:%S')
+                    except ValueError:
+                        return txt
+
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+
+            return dt.astimezone(tz_co).strftime('%Y-%m-%d %H:%M:%S')
+        except Exception:
+            return str(value)
+
     return {
         'session_timeout_seconds': int(app.config.get('SESSION_TIMEOUT_SECONDS', 1800)),
         'session_login_ts': session.get('login_at_ts'),
         'session_last_activity_ts': session.get('last_activity_ts'),
+        'fmt_dt_co': fmt_dt_co,
     }
 
 # 🔌 DB

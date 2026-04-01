@@ -65,7 +65,7 @@
             <div class="card p-3 h-100">
                 <h5 class="mb-3">Último respaldo registrado</h5>
                 {% if salud.ultimo_backup %}
-                    <div><b>Fecha:</b> {{ salud.ultimo_backup[0] }}</div>
+                    <div><b>Fecha:</b> {{ fmt_dt_co(salud.ultimo_backup[0]) }}</div>
                     <div><b>Usuario:</b> {{ salud.ultimo_backup[1] or '-' }}</div>
                     <div><b>Detalle:</b> {{ salud.ultimo_backup[2] or '-' }}</div>
                 {% else %}
@@ -77,7 +77,7 @@
             <div class="card p-3 h-100">
                 <h5 class="mb-3">Último estado de correo</h5>
                 {% if salud.ultimo_email %}
-                    <div><b>Fecha:</b> {{ salud.ultimo_email[0] }}</div>
+                    <div><b>Fecha:</b> {{ fmt_dt_co(salud.ultimo_email[0]) }}</div>
                     <div><b>Proveedor:</b> {{ salud.ultimo_email[1] or '-' }}</div>
                     <div><b>Estado:</b>
                         {% if salud.ultimo_email[2] == 'ok' %}
@@ -111,7 +111,7 @@
                     {% if salud.emails_recientes %}
                         {% for e in salud.emails_recientes %}
                         <tr>
-                            <td>{{ e[0] }}</td>
+                            <td>{{ fmt_dt_co(e[0]) }}</td>
                             <td>{{ e[1] or '-' }}</td>
                             <td>{{ e[2] or '-' }}</td>
                             <td>
